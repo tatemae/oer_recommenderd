@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/                              http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+  
+  <responseDate>2008-02-28T15:21:23Z</responseDate>
+  
+  
+  <request verb="ListRecords">http://www.oercommons.org/oai</request>
+  <ListRecords>
+   <record>
+     <header status="deleted">  
+      <identifier>oai:oercommons.org:test</identifier>
+      <datestamp>2007-04-06</datestamp>
+      <setSpec>content_type:course</setSpec>
+      <setSpec>general_subject:science-and-technology</setSpec>
+      <setSpec>edu_level:post-secondary</setSpec>
+      <setSpec>geographic_relevance:all</setSpec>
+      <setSpec>language:en</setSpec>
+      <setSpec>media_formats:text-html</setSpec>
+      <setSpec>media_formats:downloadable-docs</setSpec>
+      <setSpec>material_types:syllabi</setSpec>
+      <setSpec>material_types:lecture-notes</setSpec>
+      <setSpec>material_types:homework-and-assignments</setSpec>
+      <setSpec>material_types:assessments</setSpec>
+      <setSpec>collection:mit-opencourseware</setSpec>
+     </header>
+     <metadata>
+      
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/             http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+          <dc:identifier>http://www.oercommons.org/courses/test</dc:identifier>
+          <dc:title>Joel Wyman Kedrick Duffin Kana - Introduction to Computers and Engineering Problem Solving, Fall 2002</dc:title> 
+          <dc:description>This course presents fundamental software development and computational methods for engineering and scientific applications. Object-oriented software design and development is the focus of the course. Weekly programming problems cover programming concepts, graphical user interfaces, numerical methods, data structures, sorting and searching, computer graphics and selected advanced topics. Emphasis is on developing techniques for solving problems in engineering, science, management, and planning. The Java programming language is used.</dc:description> 
+          <dc:date>2006-03-20</dc:date>
+          <dc:creator>Harward, Judson</dc:creator>
+          <dc:subject>Science and Technology</dc:subject> 
+          <dc:type>Text</dc:type>
+          <dc:language>en</dc:language>
+          <dc:rights>Attribution Non-Commercial Share Alike 2.5</dc:rights>
+        </oai_dc:dc>
+     </metadata>
+   </record>
+   <record>
+     <header status="deleted">  
+      <identifier>oai:oercommons.org:test2</identifier>
+      <datestamp>2006-03-30</datestamp>
+      <setSpec>content_type:course</setSpec>
+      <setSpec>general_subject:science-and-technology</setSpec>
+      <setSpec>edu_level:post-secondary</setSpec>
+      <setSpec>geographic_relevance:all</setSpec>
+      <setSpec>language:en</setSpec>
+      <setSpec>media_formats:text-html</setSpec>
+      <setSpec>media_formats:downloadable-docs</setSpec>
+      <setSpec>material_types:syllabi</setSpec>
+      <setSpec>material_types:lecture-notes</setSpec>
+      <setSpec>material_types:homework-and-assignments</setSpec>
+      <setSpec>material_types:assessments</setSpec>
+      <setSpec>collection:mit-opencourseware</setSpec>
+     </header>
+     <metadata>
+      
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/             http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+          <dc:identifier>http://www.oercommons.org/courses/test</dc:identifier>
+          <dc:title>Sharwan Crap</dc:title> 
+          <dc:description>Now is the time for all good men to come to the aid of their country.</dc:description> 
+          <dc:date>2006-03-20</dc:date>
+          <dc:creator>Harward, Judson</dc:creator>
+          <dc:subject>Pig Fishing</dc:subject> 
+          <dc:type>Text</dc:type>
+          <dc:language>en</dc:language>
+          <dc:rights>Attribution Non-Commercial Share Alike 2.5</dc:rights>
+        </oai_dc:dc>
+     </metadata>
+   </record>
+ </ListRecords>
+ 
+</OAI-PMH>

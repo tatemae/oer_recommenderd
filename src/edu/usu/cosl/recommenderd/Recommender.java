@@ -250,35 +250,35 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	private int getNextID(String sTable) throws SQLException
-	{
-		ResultSet rsNextID = stNextID.executeQuery("SELECT nextval('" + sTable + "_id_seq')");
-		try
-		{
-			if (!rsNextID.next())
-			{
-				rsNextID.close();
-				throw new SQLException("Unable to retrieve the id for a newly added entry.");
-			}
-			int nNextID = rsNextID.getInt(1);
-			rsNextID.close();
-			return nNextID;
-		}
-		catch (SQLException e)
-		{
-			if (rsNextID != null) rsNextID.close();
-			throw e;
-		}
-	}
+//	private int getNextID(String sTable) throws SQLException
+//	{
+//		ResultSet rsNextID = stNextID.executeQuery("SELECT nextval('" + sTable + "_id_seq')");
+//		try
+//		{
+//			if (!rsNextID.next())
+//			{
+//				rsNextID.close();
+//				throw new SQLException("Unable to retrieve the id for a newly added entry.");
+//			}
+//			int nNextID = rsNextID.getInt(1);
+//			rsNextID.close();
+//			return nNextID;
+//		}
+//		catch (SQLException e)
+//		{
+//			if (rsNextID != null) rsNextID.close();
+//			throw e;
+//		}
+//	}
 	
 	private void addRecommendation(EntryInfo entry, EntryInfo relatedEntry, int nRank) throws SQLException
 	{
-		relatedEntry.nRecommendationID = getNextID("recommendations");
-		pstAddRecommendation.setInt(1, relatedEntry.nRecommendationID);
-		pstAddRecommendation.setInt(2, entry.nEntryID);
-		pstAddRecommendation.setInt(3, relatedEntry.nEntryID);
-		pstAddRecommendation.setInt(4, nRank);
-		pstAddRecommendation.setDouble(5, relatedEntry.dRelevance);
+//		relatedEntry.nRecommendationID = getNextID("recommendations");
+//		pstAddRecommendation.setInt(1, relatedEntry.nRecommendationID);
+		pstAddRecommendation.setInt(1, entry.nEntryID);
+		pstAddRecommendation.setInt(2, relatedEntry.nEntryID);
+		pstAddRecommendation.setInt(3, nRank);
+		pstAddRecommendation.setDouble(4, relatedEntry.dRelevance);
 		pstAddRecommendation.addBatch();
 	}
 	
@@ -492,8 +492,8 @@ public class Recommender extends DBThread
 					"SELECT id, clicks, avg_time_at_dest FROM recommendations WHERE entry_id = ? AND dest_entry_id = ?");
 				
 				pstAddRecommendation = cnRecommender.prepareStatement(
-					"INSERT INTO recommendations (id, entry_id, dest_entry_id, rank, relevance) " +
-					"VALUES (?, ?, ?, ?, ?)");
+					"INSERT INTO recommendations (entry_id, dest_entry_id, rank, relevance) " +
+					"VALUES (?, ?, ?, ?)");
 				
 				pstUpdateRecommendation = cnRecommender.prepareStatement(
 					"UPDATE recommendations SET rank = ?, relevance = ? WHERE id = ? ");
@@ -1034,7 +1034,7 @@ public class Recommender extends DBThread
 		
 		// use the aggregator to get any new records
 		boolean bChanges = Harvester.harvest();
-		if (!bChanges && !bRedoAllRecommendations) return;
+		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try
 		{

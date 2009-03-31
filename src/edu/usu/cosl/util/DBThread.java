@@ -18,7 +18,8 @@ public class DBThread extends Thread {
 	public static void loadDBDriver() throws ClassNotFoundException
 	{
 		// initialize the connection pool
-		Class.forName("org.postgresql.Driver");
+//		Class.forName("org.postgresql.Driver");
+		Class.forName("com.mysql.jdbc.Driver");
 		Class.forName("org.apache.commons.dbcp.PoolingDriver");
 		bDriverLoaded = true;
 	}

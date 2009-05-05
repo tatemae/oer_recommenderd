@@ -28,7 +28,8 @@ public class LuceneDocument {
 	    	entry.sTagList + " " + entry.sTagList;  
 	    
 	    doc.add(new Field("text", sText, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-
+	    
+	    doc.add(new Field("tag", sText, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
 	    return doc;
 	  }
 	  catch (Exception e)

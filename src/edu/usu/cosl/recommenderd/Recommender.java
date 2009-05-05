@@ -26,6 +26,8 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TermEnum;
+import org.apache.lucene.index.TermFreqVector;
 import org.apache.lucene.search.Hit;
 import org.apache.lucene.search.HitIterator;
 import org.apache.lucene.search.Hits;
@@ -55,6 +57,14 @@ public class Recommender extends DBThread
 	private PreparedStatement pstSetDocumentRecommendations;
 	private PreparedStatement pstDeleteEntryRecommendations;
 	private PreparedStatement pstDeleteEntry;
+	private PreparedStatement pstAddTags;
+	private PreparedStatement pstAddStemFreq;
+	private PreparedStatement pstUpdateTags;
+	private PreparedStatement pstGetTagName;
+	private PreparedStatement pstAddTagsEntries;
+	//private PreparedStatement sqlGetEntriesForTags;
+	private PreparedStatement pstFlagTagsEntries;
+	private PreparedStatement pstGenerateTags;
 	
 	private String sSolrDir = "solr/";
 	private MultiCore mcore;
@@ -63,7 +73,6 @@ public class Recommender extends DBThread
 	private Hashtable<String, IndexWriter> htWriters;
 	private Hashtable<String, IndexReader> htReaders;
 	private Hashtable<String, IndexSearcher> htSearchers;
-	
 	private int nMaxRecommendations = 20;
 	private String sSMTPServer = null;
 	private String sAdminEmail = null;
@@ -557,6 +566,324 @@ public class Recommender extends DBThread
 		}
 	}
 	
+	
+	class TagStemmer extends org.apache.lucene.analysis.Tokenizer
+    {
+		private org.apache.solr.analysis.EnglishPorterFilterFactory factoryen;
+		private edu.usu.cosl.analysis.es.SpanishPorterFilterFactory factoryes;
+		private org.apache.solr.analysis.GermanStemFilterFactory factoryde;
+		private org.apache.solr.analysis.FrenchStemFilterFactory factoryfr;
+		private org.apache.solr.analysis.EnglishPorterFilterFactory factoryja;
+		private org.apache.solr.analysis.DutchStemFilterFactory factorynl;
+		private org.apache.solr.analysis.RussianStemFilterFactory factoryru;
+		private org.apache.solr.analysis.ChineseFilterFactory factoryzh;
+        private org.apache.lucene.analysis.Token token;
+        private org.apache.lucene.analysis.TokenStream tokenStream;
+        
+        public TagStemmer(String language) 
+        {
+        	if("en".equals(language))
+        	{
+        		factoryen = new org.apache.solr.analysis.EnglishPorterFilterFactory();
+        		tokenStream = factoryen.create(this);
+        	}
+        	else if("es".equals(language))
+        	{
+        		factoryes = new edu.usu.cosl.analysis.es.SpanishPorterFilterFactory();
+        		tokenStream = factoryes.create(this);
+        	}
+        	else if("de".equals(language))
+        	{
+        		factoryde=new org.apache.solr.analysis.GermanStemFilterFactory();
+        		tokenStream = factoryde.create(this);
+        	}
+        	else if("fr".equals(language))
+        	{
+        		factoryfr=new org.apache.solr.analysis.FrenchStemFilterFactory();
+        		tokenStream = factoryfr.create(this);
+        	}
+        	else if("ja".equals(language))
+        	{
+        		factoryja = new org.apache.solr.analysis.EnglishPorterFilterFactory();
+        		tokenStream = factoryja.create(this);
+        	    	
+        	}
+        	else if("nl".equals(language))
+        	{
+        		factorynl = new org.apache.solr.analysis.DutchStemFilterFactory();
+        		tokenStream = factorynl.create(this);
+        	}
+        	else if("ru".equals(language))
+        	{
+        		factoryru = new org.apache.solr.analysis.RussianStemFilterFactory();
+        		tokenStream = factoryru.create(this);
+        	}
+        	else if("zh".equals(language))
+        	{
+        		tokenStream = new org.apache.solr.analysis.ChineseFilterFactory().create(this);
+        	}
+        	token = new org.apache.lucene.analysis.Token();
+        	
+        }
+        public org.apache.lucene.analysis.Token next()
+        {
+            return token; 
+        }
+        @SuppressWarnings("deprecation")
+		public String getStem(String sTerm)
+        {
+        	token.setTermText(sTerm);
+            try {
+            	return tokenStream.next().termText();
+            } catch (java.io.IOException e) {
+                Logger.error(e);
+                return sTerm;
+            }
+        }
+    }
+	private void getNonStemTerms() {
+		
+		
+		try {
+			Object[] languages=htReaders.keySet().toArray();
+			for(int i=0; i<languages.length;i++)
+			{
+				
+			//	s=htReaders.keySet().iterator().next().;
+				TagStemmer stemmer = new TagStemmer(languages[i].toString());
+				IndexReader reader = htReaders.get(languages[i].toString());
+				TermEnum te = reader.terms(new Term ("tag", ""));
+				int numoftags=0;
+				while (te.next()){
+					Term term = te.term();
+					int f = te.docFreq();
+					
+					if(f>0&&"tag".equals(te.term().field()))
+					{
+						numoftags++;
+						String output=term.text().toString();
+						pstGetTagName.setString(1, output);
+						pstGetTagName.setInt(2, f);
+						ResultSet res=pstGetTagName.executeQuery();
+						if(res.next())
+						{
+							pstUpdateTags.setInt(1, f);
+							pstUpdateTags.setString(2, output);
+							pstUpdateTags.addBatch();
+							
+						}
+						else
+						{
+							pstAddTags.setInt(1, 0);
+							pstAddTags.setString(2, output);
+							pstAddTags.setString(3, stemmer.getStem(output));
+							pstAddTags.setInt(4, f);
+							pstAddTags.addBatch();
+							
+						}
+						
+						if (numoftags%1000==0)
+						{
+							pstAddTags.executeBatch();
+							pstUpdateTags.executeBatch();
+							Logger.status("WriteTagstoDB: " + numoftags);
+							
+						}
+						
+						
+						
+					}
+					
+				}
+				if (numoftags%1000!=0)
+				{
+					pstAddTags.executeBatch();
+					pstUpdateTags.executeBatch();
+					Logger.status("WriteTagstoDB: " + numoftags);
+				}
+			}		
+		} catch (Exception e) {
+			Logger.info(e.toString());
+		}
+	}
+	private void getStemTerms() {
+		
+		
+		try {
+			//TagStemmer stemmer = new TagStemmer();
+			Object[] languages = htReaders.keySet().toArray();
+			for(int i=0; i<languages .length;i++)
+			{
+				int numofstems=0;
+				IndexReader reader = htReaders.get(languages[i].toString());
+				
+				TermEnum te = reader.terms(new Term ("text", ""));
+				while (te.next()){
+					Term term = te.term();
+					int f = te.docFreq();
+					if(f>0&&"text".equals(te.term().field()))
+					{
+						numofstems++;
+						String output=term.text().toString();
+						pstAddStemFreq.setInt(1, f);
+						pstAddStemFreq.setString(2, output);
+						pstAddStemFreq.addBatch();
+						if ("a".equals(output.toString()))
+						{
+							Logger.status("get it");
+						}
+						if (numofstems%1000==0)
+						{
+							pstAddStemFreq.executeBatch();
+							Logger.status("WriteStemstoDB: " + numofstems);
+							
+						}
+						
+					}
+					
+				}
+				if(numofstems%1000!=0)
+				{
+					pstAddStemFreq.executeBatch();
+					Logger.status("WriteStemstoDB: " + numofstems);
+				}
+			}
+		
+		} catch (Exception e) {
+			Logger.info(e.toString());
+		}
+	}
+	private void generateTagsEntries() {
+	    try
+	    {
+	    	IndexReader reader = htReaders.get("en");
+	    	int num=0;
+	    	int numofdoc=reader.numDocs();
+	    	//sqlAdd
+	    	pstAddTagsEntries=cnRecommender.prepareStatement(
+	    			"INSERT INTO entries_tags (entry_id, tag_id) "+
+	    			"VALUES (?,?) ");
+	    	pstFlagTagsEntries=cnRecommender.prepareStatement(
+	    			"SELECT * FROM entries_tags where entry_id=? AND tag_id=?");
+	    	
+	    	while(num<numofdoc)
+	    	{
+	    		Statement sqlGetEntriesForTags=cnRecommender.createStatement();
+	    		TermFreqVector termFreqVector = reader.getTermFreqVector(num, "text");
+	    	    Document doc=reader.document(num);
+	    	    int entryid=Integer.parseInt(doc.getField("id").stringValue().substring(6));
+	    	    if (termFreqVector!=null)
+	    	    {
+	    	    	String[] terms=termFreqVector.getTerms();
+	    	    	String termlist="\""+terms[0]+"\""; 
+	    	    	for(int i=1;i<terms.length;i++)
+	    	    	{
+	    	    		termlist=termlist+","+"\""+terms[i]+"\"";
+	    	    	}
+	    	    	ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery("SELECT id FROM tags WHERE root=1 AND stem in (" +
+	    	    			termlist + ")");
+	    	    	while(rootIdindex.next())
+	    	    	{
+	    	    		int rootid=rootIdindex.getInt(1);
+	    	    		pstAddTagsEntries.setInt(1, entryid);
+	    	    		pstAddTagsEntries.setInt(2, rootid);
+	    	    		pstAddTagsEntries.addBatch();
+	    	    		
+	    	    	}
+	    	    	
+	    	    	/*for(int i=0;i<terms.length;i++)
+	    	    	{
+	    	    		sqlGetEntriesForTags.setString(1, terms[i]);
+	    	    		ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery();
+	    	    		sqlGetEntriesForTags.clearParameters();
+	    	    		int rootid;
+	    	    		rootIdindex.next();
+	    	    		rootid=rootIdindex.getInt(1);
+	    	    		sqlFlagTagsEntries.setInt(1, entryid);
+	    	    		sqlFlagTagsEntries.setInt(2, rootid);
+	    	    		ResultSet flagofexists=sqlFlagTagsEntries.executeQuery();
+	    	    		if(!flagofexists.next())
+	    	    		{
+		    	    		sqlAddTagsEntries.setInt(1, entryid);
+		    	    		sqlAddTagsEntries.setInt(2, rootid);
+		    	    		sqlAddTagsEntries.addBatch();
+	    	    		}
+	    	    	}*/
+	    	    	pstAddTagsEntries.executeBatch();
+	    	    	
+	    	    }
+	    	    sqlGetEntriesForTags.close();
+	    		if(num%100==0)
+	    		{
+	    			Logger.status("WriteintoTagsEntries"+num);
+	    		}
+	    		num++;
+	    	}
+	    	if(num%100!=0)
+	    	{
+		    	//sqlAddTagsEntries.executeBatch();
+				Logger.status("WriteintoTagsEntries"+num);
+	    	}
+	    	pstAddTagsEntries.close();
+	    	pstFlagTagsEntries.close();
+	    }
+	    catch (Exception e)
+	    {
+	    	Logger.info(e.toString());
+	    }
+	}
+
+	private void updateTags()
+	{
+		try
+		{
+			createIndexReaders();
+			createIndexSearchers();
+			pstGetTagName =cnRecommender.prepareStatement(
+					"SELECT id FROM tags WHERE name=? and frequency=?");
+			pstAddTags = cnRecommender.prepareStatement(
+					"INSERT INTO tags (id, name, stem, frequency) " +
+					"VALUES (?, ?, ?, ?)");
+			pstUpdateTags = cnRecommender.prepareStatement(
+					"UPDATE tags "+
+					"SET frequency =? " +
+					"where name = ? "
+					);
+			getNonStemTerms();
+			pstAddStemFreq =cnRecommender.prepareStatement(
+                    "UPDATE tags SET stem_frequency = ? where stem = ? ");
+			getStemTerms();
+			pstGenerateTags =cnRecommender.prepareStatement(
+					"UPDATE tags,"+
+					"(SELECT a.id, a.name,(SELECT max(frequency) "+
+					"FROM tags WHERE a.stem=stem AND a.frequency>=frequency) AS frequency, a.stem,"+
+					"NOT EXISTS (SELECT id FROM tags WHERE a.stem=stem AND a.frequency<frequency) AS root FROM tags a) c " +
+					"SET tags.root=c.root WHERE tags.id=c.id ");
+			pstGenerateTags.executeUpdate();
+			Statement sqlMinLenName=cnRecommender.createStatement(); 
+			sqlMinLenName.execute("UPDATE tags, (SELECT id FROM tags WHERE root=1 GROUP BY stem ORDER BY length(name))b SET tags.root=null WHERE tags.root=1 AND tags.id =b.id");
+			Statement sqlZeroMinLenName=cnRecommender.createStatement(); 
+			sqlZeroMinLenName.execute("UPDATE tags SET root=0 WHERE root=1");
+			Statement sqlFlagMinLenName=cnRecommender.createStatement(); 
+			sqlFlagMinLenName.execute("UPDATE tags SET root=1 WHERE root IS NULL");
+			generateTagsEntries();
+			pstGetTagName.close();
+			pstAddTags.close();
+			pstUpdateTags.close();
+			pstAddStemFreq.close();
+			pstGenerateTags.close();
+			sqlMinLenName.close();
+			sqlZeroMinLenName.close();
+			sqlFlagMinLenName.close();
+		    closeIndexSearchers();
+		    closeIndexReaders();
+		}
+		catch (Exception e)
+		{
+			Logger.error("updateTags - ", e);
+		}
+	}
+
 	private void indexEntry(EntryInfo entry) throws Exception 
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
@@ -874,7 +1201,9 @@ public class Recommender extends DBThread
 		{
 			SolrCore core = eCores.nextElement();
 			String sName = core.getName();
+			String test=core.getIndexDir();
 			htWriters.put(sName, new IndexWriter(core.getIndexDir(), htAnalyzers.get(sName)));
+			
 		}
 	}
 	
@@ -1051,6 +1380,9 @@ public class Recommender extends DBThread
 			// create recommendations just for the new records, or for all
 			updateRecommendations(bRedoAllRecommendations);
 			
+			// update tag lists
+			if (bChanges) updateTags();
+			
 			// close the lucene indexes
 			closeCores();
 			
@@ -1082,5 +1414,6 @@ public class Recommender extends DBThread
 	public static void main(String[] args) 
 	{
 		update(args.length > 0 ? args[0] : "");
+		System.exit(0) ;
 	}
 }

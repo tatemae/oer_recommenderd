@@ -65,6 +65,7 @@ public class Recommender extends DBThread
 	//private PreparedStatement sqlGetEntriesForTags;
 	private PreparedStatement pstFlagTagsEntries;
 	private PreparedStatement pstGenerateTags;
+	private PreparedStatement pstAddPersonalRec;
 	
 	private String sSolrDir = "solr/";
 	private MultiCore mcore;
@@ -383,6 +384,8 @@ public class Recommender extends DBThread
 		    mlt.setMinDocFreq(2);
 		    mlt.setBoost(true);
 		    Query like = mlt.like(nDocID);
+		    Logger.info("Query terms: " + like.toString().split("text:").length);
+		    Logger.info(like.toString());
 //		    Logger.info("title: " + entry.sTitle);
 //		    Logger.info("description: " + entry.sDescription);
 //		    Logger.info("tag_list: " + entry.sTagList);
@@ -407,6 +410,7 @@ public class Recommender extends DBThread
 		    	
 		    	// don't include ourselves as a recommendation
 		    	if (nDocID == hit.getId()) continue;
+		    	int id=hit.getId();
 
 		    	String sTitle = null;
 				String sNormalizedTitle = null;
@@ -479,6 +483,24 @@ public class Recommender extends DBThread
 		Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
 		updateRecommendations(vIDs);
 		Logger.status("updateRecommendations - end");
+	}
+	private void updatePersonalRecommendations(boolean bAll) throws SQLException
+	{
+		Statement stTruncPersonalRec=cnRecommender.createStatement();
+		stTruncPersonalRec.executeQuery("TRUNCATE TABLE personal_recommendations");
+		//Join table attentions, action_type, recommendations to generate table personal_recommendations
+		pstAddPersonalRec=cnRecommender.prepareStatement(
+				"INSERT INTO personal_recommendations (personal_recommendable_id,personal_recommendable_type,destination_id,relevance)" +
+				"SELECT at.attentionable_id, at.attentionable_type,r.dest_entry_id,"+
+				"MAX((at.weight)*(ac.weight)*(r.relevance)) as score "+
+				"FROM attentions at, action_types ac, recommendations r "+
+				"WHERE at.action_type=ac.action_type AND at.entry_id=r.entry_id "+
+				"GROUP BY dest_entry_id , attentionable_id "+
+				"ORDER BY attentionable_id");
+		pstAddPersonalRec.execute();
+		pstAddPersonalRec.close();
+		
+		
 	}
 	private void updateRecommendations(Vector<Integer> vIDs)
 	{
@@ -1417,6 +1439,7 @@ public class Recommender extends DBThread
 		
 		// use the aggregator to get any new records
 		boolean bChanges = Harvester.harvest();
+		//boolean bChanges=true;
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try
@@ -1433,6 +1456,9 @@ public class Recommender extends DBThread
 			
 			// create recommendations just for the new records, or for all
 			updateRecommendations(bRedoAllRecommendations);
+			
+			// create recommendations for new users or update recommendations for old ones
+			updatePersonalRecommendations(bRedoAllRecommendations);
 			
 			// update tag lists
 			if (bChanges) updateTags();

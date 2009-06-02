@@ -1,32 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jre1.6.0_02"/>
 	<classpathentry kind="lib" path="lib/commons-codec-1.3.jar"/>
 	<classpathentry kind="lib" path="lib/commons-daemon.jar"/>
 	<classpathentry kind="lib" path="lib/commons-dbcp-1.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/commons-httpclient-3.0.jar"/>
 	<classpathentry kind="lib" path="lib/commons-logging-1.0.4.jar"/>
 	<classpathentry kind="lib" path="lib/commons-pool-1.3.jar"/>
 	<classpathentry kind="lib" path="lib/delicious-1.13.jar"/>
 	<classpathentry kind="lib" path="lib/flickrapi-1.0a9.jar"/>
 	<classpathentry kind="lib" path="lib/jdom.jar"/>
 	<classpathentry kind="lib" path="lib/jericho.jar"/>
-	<classpathentry kind="lib" path="lib/postgresql-8.1-407.jdbc2ee.jar"/>
 	<classpathentry kind="lib" path="lib/rome-0.9.jar"/>
 	<classpathentry kind="lib" path="lib"/>
-	<classpathentry kind="lib" path="lib/lucene-queries-2.3.1.jar" sourcepath="C:/java/lucene-2.3.1/contrib/queries/src/java"/>
-	<classpathentry kind="lib" path="lib/lucene-analyzers-2.3.1.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-core-2.3.1.jar" sourcepath="C:/java/lucene-2.3.1/src"/>
-	<classpathentry kind="lib" path="lib/lucene-snowball-2.3.1.jar"/>
-	<classpathentry kind="lib" path="lib/apache-solr-1.3.1.jar" sourcepath="/solr_1.3.1/src"/>
-	<classpathentry kind="lib" path="lib/lucene-highlighter-2.3.1.jar"/>
 	<classpathentry kind="lib" path="lib/axis.jar"/>
 	<classpathentry kind="lib" path="lib/commons-discovery-0.2.jar"/>
 	<classpathentry kind="lib" path="lib/javax.jms.jar"/>
 	<classpathentry kind="lib" path="lib/jaxrpc.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.8.jar"/>
 	<classpathentry kind="lib" path="lib/wsdl4j-1.5.1.jar"/>
-	<classpathentry kind="lib" path="lib/aggregatord.jar" sourcepath="/aggregatord/src"/>
+	<classpathentry kind="lib" path="lib/mail.jar"/>
+	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.7-bin.jar"/>
+	<classpathentry kind="lib" path="lib/apache-solr-core-1.3.0.jar" sourcepath="c:/java/apache-solr-1.3.0.zip"/>
+	<classpathentry kind="lib" path="lib/apache-solr-common-1.3.0.jar"/>
+	<classpathentry kind="lib" path="lib/apache-solr-dataimporthandler-1.3.0.jar"/>
+	<classpathentry kind="lib" path="lib/commons-csv-1.0-SNAPSHOT-r609327.jar"/>
+	<classpathentry kind="lib" path="lib/commons-fileupload-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/commons-httpclient-3.1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-io-1.3.1.jar"/>
+	<classpathentry kind="lib" path="lib/geronimo-stax-api_1.0_spec-1.0.1.jar"/>
+	<classpathentry kind="lib" path="lib/junit-4.3.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-analyzers-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-core-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-highlighter-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-memory-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-queries-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-snowball-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-spellchecker-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
+	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.6.0_03"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregator"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

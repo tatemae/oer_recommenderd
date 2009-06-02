@@ -40,7 +40,7 @@ import edu.usu.cosl.util.DBThread;
 import edu.usu.cosl.util.Logger;
 import edu.usu.cosl.util.SendMail;
 
-import org.apache.solr.core.MultiCore;
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 
@@ -68,7 +68,7 @@ public class Recommender extends DBThread
 	private PreparedStatement pstAddPersonalRec;
 	
 	private String sSolrDir = "solr/";
-	private MultiCore mcore;
+	private CoreContainer mcore;
 	private Vector<SolrCore> vCores;
 	private Hashtable<String, Analyzer> htAnalyzers;
 	private Hashtable<String, IndexWriter> htWriters;
@@ -384,8 +384,8 @@ public class Recommender extends DBThread
 		    mlt.setMinDocFreq(2);
 		    mlt.setBoost(true);
 		    Query like = mlt.like(nDocID);
-		    Logger.info("Query terms: " + like.toString().split("text:").length);
-		    Logger.info(like.toString());
+		   // Logger.info("Query terms: " + like.toString().split("text:").length);
+		    //Logger.info(like.toString());
 //		    Logger.info("title: " + entry.sTitle);
 //		    Logger.info("description: " + entry.sDescription);
 //		    Logger.info("tag_list: " + entry.sTagList);
@@ -1157,7 +1157,7 @@ public class Recommender extends DBThread
         java.util.logging.Logger.getLogger(org.apache.solr.request.XSLTResponseWriter.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.search.SolrIndexSearcher.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.handler.component.SearchHandler.class.getName()).setLevel(level);
-        java.util.logging.Logger.getLogger(org.apache.solr.core.MultiCore.class.getName()).setLevel(level);
+        java.util.logging.Logger.getLogger(org.apache.solr.core.CoreContainer.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.update.DirectUpdateHandler2.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.core.Config.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.update.UpdateHandler.class.getName()).setLevel(level);
@@ -1195,18 +1195,24 @@ public class Recommender extends DBThread
 	private void initMultiCore() throws Exception 
 	{
 		// since SolrDispatchFilter can be derived & initMultiCore can be overriden
-		mcore = org.apache.solr.core.SolrMultiCore.getInstance();
-		if (mcore.isEnabled()) 
-		{
-			Logger.info("Using existing multicore configuration");
-		} 
-		else 
-		{
+		org.apache.solr.core.CoreContainer.Initializer initializer = new org.apache.solr.core.CoreContainer.Initializer();
+		initializer.setSolrConfigFilename(sSolrDir + File.separatorChar + "solr.xml");
+		mcore = initializer.initialize();
+		File fconf = new File(sSolrDir, "solr.xml");
+		Logger.info("looking for solr.xml: " + fconf.getAbsolutePath());
+		mcore.load(sSolrDir, fconf);
+	
+//		if (mcore.isEnabled())  
+//		{
+//			Logger.info("Using existing multicore configuration");
+//		} 
+//		else 
+//		{
 			// multicore load
-			File fconf = new File(sSolrDir, "multicore.xml");
-			Logger.info("looking for multicore.xml: " + fconf.getAbsolutePath());
-			mcore.load(sSolrDir, fconf);
-		}
+//			File fconf = new File(sSolrDir, "solr.xml");
+//			Logger.info("looking for solr.xml: " + fconf.getAbsolutePath());
+//			mcore.load(sSolrDir, fconf);
+//		}
 	}
 
 	private void closeCores()
@@ -1438,8 +1444,8 @@ public class Recommender extends DBThread
 		Logger.status("processDocuments - begin");
 		
 		// use the aggregator to get any new records
-		boolean bChanges = Harvester.harvest();
-		//boolean bChanges=true;
+		//boolean bChanges = Harvester.harvest();
+		boolean bChanges=true;
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try

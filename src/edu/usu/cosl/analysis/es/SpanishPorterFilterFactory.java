@@ -62,12 +62,12 @@ public class SpanishPorterFilterFactory extends BaseTokenFilterFactory implement
  */
 class SpanishPorterFilter extends TokenFilter {
   private final Set protWords;
-  private net.sf.snowball.ext.SpanishStemmer stemmer;
+  private org.tartarus.snowball.ext.SpanishStemmer stemmer;
 
   public SpanishPorterFilter(TokenStream source, Set protWords) {
     super(source);
     this.protWords=protWords;
-    stemmer = new net.sf.snowball.ext.SpanishStemmer();
+    stemmer = new org.tartarus.snowball.ext.SpanishStemmer();
   }
 
 

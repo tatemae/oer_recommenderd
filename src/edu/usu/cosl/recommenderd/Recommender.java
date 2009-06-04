@@ -77,6 +77,8 @@ public class Recommender extends DBThread
 	private int nMaxRecommendations = 20;
 	private String sSMTPServer = null;
 	private String sAdminEmail = null;
+	private Hashtable<Integer, String> htIDToLanguages = new Hashtable<Integer, String>();
+	private Hashtable<String, Integer> htLanguagesToID = new Hashtable<String, Integer>();
 	private Logger log = new Logger();
 
 	static private String quoteEncode(String sText)
@@ -364,23 +366,23 @@ public class Recommender extends DBThread
 		try
 		{
 			// if we don't have an anlyzer for the language, bail
-			Analyzer analyzer = htAnalyzers.get(entry.sLanguage);
+			Analyzer analyzer = htAnalyzers.get(htIDToLanguages.get(entry.nLanguageID));
 		    if (analyzer == null) return vEntries;
 		    
 		    // find the lucene document for the entry
 			TermQuery query = new TermQuery(new Term("id","Entry:" + entry.nEntryID));
-			IndexSearcher searcher = htSearchers.get(entry.sLanguage);
+			IndexSearcher searcher = htSearchers.get(htIDToLanguages.get(entry.nLanguageID));
 		    Hits hits = searcher.search(query);
 		    int nDocID = hits.id(0);
 		    if (hits.length() == 0 || nDocID == 0) return vEntries;
 		    
 		    // ask lucene for more entries like this on
-		    IndexReader reader = htReaders.get(entry.sLanguage);
+		    IndexReader reader = htReaders.get(htIDToLanguages.get(entry.nLanguageID));
 		    MoreLikeThis mlt = new MoreLikeThis(reader);
 		    mlt.setMinTermFreq(1);
 		    mlt.setAnalyzer(analyzer);
 		    mlt.setFieldNames(new String[]{"text"});
-		    mlt.setMinWordLen(("zh".equals(entry.sLanguage) || "ja".equals(entry.sLanguage)) ? 1 : 4);
+		    mlt.setMinWordLen(("zh".equals(htIDToLanguages.get(entry.nLanguageID)) || "ja".equals(htIDToLanguages.get(entry.nLanguageID))) ? 1 : 4);
 		    mlt.setMinDocFreq(2);
 		    mlt.setBoost(true);
 		    Query like = mlt.like(nDocID);
@@ -479,7 +481,8 @@ public class Recommender extends DBThread
 	
 	private void updateRecommendations(boolean bAll) throws SQLException
 	{
-		Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE indexed_at > relevance_calculated_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
+		//Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE indexed_at > relevance_calculated_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
+		Vector<Integer> vIDs = getIDsOfEntries(bAll ? "":"WHERE indexed_at > relevance_calculated_at");
 		Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
 		updateRecommendations(vIDs);
 		Logger.status("updateRecommendations - end");
@@ -537,7 +540,7 @@ public class Recommender extends DBThread
 					"UPDATE entries SET relevance_calculated_at = now() WHERE id = ?");
 		
 				PreparedStatement pstEntryToCreateRecommendationsFor = cnRecommender.prepareStatement(
-					"SELECT id, feed_id, permalink, direct_link, title, description, tag_list, language " +
+					"SELECT id, feed_id, permalink, direct_link, title, description, tag_list, language_id " +
 					"FROM entries WHERE id = ?");
 				
 				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
@@ -778,76 +781,80 @@ public class Recommender extends DBThread
 	private void generateTagsEntries() {
 	    try
 	    {
-	    	IndexReader reader = htReaders.get("en");
-	    	int num=0;
-	    	int numofdoc=reader.numDocs();
-	    	//sqlAdd
-	    	pstAddTagsEntries=cnRecommender.prepareStatement(
-	    			"INSERT INTO entries_tags (entry_id, tag_id) "+
-	    			"VALUES (?,?) ");
-	    	pstFlagTagsEntries=cnRecommender.prepareStatement(
-	    			"SELECT * FROM entries_tags where entry_id=? AND tag_id=?");
-	    	
-	    	while(num<numofdoc)
-	    	{
-	    		Statement sqlGetEntriesForTags=cnRecommender.createStatement();
-	    		TermFreqVector termFreqVector = reader.getTermFreqVector(num, "text");
-	    	    Document doc=reader.document(num);
-	    	    int entryid=Integer.parseInt(doc.getField("id").stringValue().substring(6));
-	    	    if (termFreqVector!=null)
-	    	    {
-	    	    	String[] terms=termFreqVector.getTerms();
-	    	    	String termlist="\""+terms[0]+"\""; 
-	    	    	for(int i=1;i<terms.length;i++)
-	    	    	{
-	    	    		termlist=termlist+","+"\""+terms[i]+"\"";
-	    	    	}
-	    	    	ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery("SELECT id FROM tags WHERE root=1 AND stem in (" +
-	    	    			termlist + ")");
-	    	    	while(rootIdindex.next())
-	    	    	{
-	    	    		int rootid=rootIdindex.getInt(1);
-	    	    		pstAddTagsEntries.setInt(1, entryid);
-	    	    		pstAddTagsEntries.setInt(2, rootid);
-	    	    		pstAddTagsEntries.addBatch();
-	    	    		
-	    	    	}
-	    	    	
-	    	    	/*for(int i=0;i<terms.length;i++)
-	    	    	{
-	    	    		sqlGetEntriesForTags.setString(1, terms[i]);
-	    	    		ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery();
-	    	    		sqlGetEntriesForTags.clearParameters();
-	    	    		int rootid;
-	    	    		rootIdindex.next();
-	    	    		rootid=rootIdindex.getInt(1);
-	    	    		sqlFlagTagsEntries.setInt(1, entryid);
-	    	    		sqlFlagTagsEntries.setInt(2, rootid);
-	    	    		ResultSet flagofexists=sqlFlagTagsEntries.executeQuery();
-	    	    		if(!flagofexists.next())
-	    	    		{
-		    	    		sqlAddTagsEntries.setInt(1, entryid);
-		    	    		sqlAddTagsEntries.setInt(2, rootid);
-		    	    		sqlAddTagsEntries.addBatch();
-	    	    		}
-	    	    	}*/
-	    	    	pstAddTagsEntries.executeBatch();
-	    	    	
-	    	    }
-	    	    sqlGetEntriesForTags.close();
-	    		if(num%100==0)
-	    		{
-	    			Logger.status("WriteintoTagsEntries"+num);
-	    		}
-	    		num++;
-	    	}
-	    	if(num%100!=0)
-	    	{
-		    	//sqlAddTagsEntries.executeBatch();
-				Logger.status("WriteintoTagsEntries"+num);
-	    	}
-	    	pstAddTagsEntries.close();
-	    	pstFlagTagsEntries.close();
+	    	Object[] languages = htReaders.keySet().toArray();
+	    	for(int j=0; j<languages.length;j++)
+			{
+		    	IndexReader reader = htReaders.get(languages[j].toString());
+		    	int num=0;
+		    	int numofdoc=reader.numDocs();
+		    	//sqlAdd
+		    	pstAddTagsEntries=cnRecommender.prepareStatement(
+		    			"INSERT INTO entries_tags (entry_id, tag_id) "+
+		    			"VALUES (?,?) ");
+		    	pstFlagTagsEntries=cnRecommender.prepareStatement(
+		    			"SELECT * FROM entries_tags where entry_id=? AND tag_id=?");
+		    	
+		    	while(num<numofdoc)
+		    	{
+		    		Statement sqlGetEntriesForTags=cnRecommender.createStatement();
+		    		TermFreqVector termFreqVector = reader.getTermFreqVector(num, "text");
+		    	    Document doc=reader.document(num);
+		    	    int entryid=Integer.parseInt(doc.getField("id").stringValue().substring(6));
+		    	    if (termFreqVector!=null)
+		    	    {
+		    	    	String[] terms=termFreqVector.getTerms();
+		    	    	String termlist="\""+terms[0]+"\""; 
+		    	    	for(int i=1;i<terms.length;i++)
+		    	    	{
+		    	    		termlist=termlist+","+"\""+terms[i]+"\"";
+		    	    	}
+		    	    	ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery("SELECT id FROM tags WHERE root=1 AND stem in (" +
+		    	    			termlist + ")");
+		    	    	while(rootIdindex.next())
+		    	    	{
+		    	    		int rootid=rootIdindex.getInt(1);
+		    	    		pstAddTagsEntries.setInt(1, entryid);
+		    	    		pstAddTagsEntries.setInt(2, rootid);
+		    	    		pstAddTagsEntries.addBatch();
+		    	    		
+		    	    	}
+		    	    	
+		    	    	/*for(int i=0;i<terms.length;i++)
+		    	    	{
+		    	    		sqlGetEntriesForTags.setString(1, terms[i]);
+		    	    		ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery();
+		    	    		sqlGetEntriesForTags.clearParameters();
+		    	    		int rootid;
+		    	    		rootIdindex.next();
+		    	    		rootid=rootIdindex.getInt(1);
+		    	    		sqlFlagTagsEntries.setInt(1, entryid);
+		    	    		sqlFlagTagsEntries.setInt(2, rootid);
+		    	    		ResultSet flagofexists=sqlFlagTagsEntries.executeQuery();
+		    	    		if(!flagofexists.next())
+		    	    		{
+			    	    		sqlAddTagsEntries.setInt(1, entryid);
+			    	    		sqlAddTagsEntries.setInt(2, rootid);
+			    	    		sqlAddTagsEntries.addBatch();
+		    	    		}
+		    	    	}*/
+		    	    	pstAddTagsEntries.executeBatch();
+		    	    	
+		    	    }
+		    	    sqlGetEntriesForTags.close();
+		    		if(num%100==0)
+		    		{
+		    			Logger.status("WriteintoTagsEntries"+num);
+		    		}
+		    		num++;
+		    	}
+		    	if(num%100!=0)
+		    	{
+			    	//sqlAddTagsEntries.executeBatch();
+					Logger.status("WriteintoTagsEntries"+num);
+		    	}
+		    	pstAddTagsEntries.close();
+		    	pstFlagTagsEntries.close();
+			}
 	    }
 	    catch (Exception e)
 	    {
@@ -963,10 +970,10 @@ public class Recommender extends DBThread
 	private void indexEntry(EntryInfo entry) throws Exception 
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		Analyzer analyzer = htAnalyzers.get(entry.sLanguage);
+		Analyzer analyzer = htAnalyzers.get(htIDToLanguages.get(entry.nLanguageID));
 		if (analyzer != null)
 		{
-			htWriters.get(entry.sLanguage).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
+			htWriters.get(htIDToLanguages.get(entry.nLanguageID)).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
 		}
 		pstFlagEntryIndexed.setInt(1, entry.nEntryID);
 		pstFlagEntryIndexed.addBatch();
@@ -990,7 +997,7 @@ public class Recommender extends DBThread
 	private void removeEntryFromIndex(EntryInfo entry) throws Exception
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		htWriters.get(entry.sLanguage).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
+		htWriters.get(htIDToLanguages.get(entry.nLanguageID)).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
 	}
 	
 	private void getIDsOfEntriesPointingAtEntry(Vector<Integer> vIDs, int nEntryID) throws SQLException
@@ -1009,12 +1016,12 @@ public class Recommender extends DBThread
 		Vector<EntryInfo> vEntries = new Vector<EntryInfo>();
 
 		Statement stEntries = cnRecommender.createStatement();
-		ResultSet rsEntries = stEntries.executeQuery("SELECT id, language FROM entries WHERE oai_identifier = 'deleted'");
+		ResultSet rsEntries = stEntries.executeQuery("SELECT id, language_id FROM entries WHERE oai_identifier = 'deleted'");
 		while (rsEntries.next())
 		{
 			EntryInfo entry = new EntryInfo();
 			entry.nEntryID = rsEntries.getInt(1);
-			entry.sLanguage = rsEntries.getString(2);
+			entry.nLanguageID = rsEntries.getInt(2);
 			vEntries.add(entry);
 		}
 		rsEntries.close();
@@ -1096,12 +1103,13 @@ public class Recommender extends DBThread
 		
 				PreparedStatement pstEntryToIndex = cnRecommender.prepareStatement(
 						"SELECT entries.id, entries.feed_id, permalink, direct_link, entries.title, entries.description, " + 
-						"tag_list, entries.language, feeds.short_title AS collection " + 
+						"tag_list, entries.language_id, feeds.short_title AS collection " + 
 						"FROM entries " +
 						"INNER JOIN feeds ON entries.feed_id = feeds.id " +
 						"WHERE entries.id = ?");
 				
-				Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE harvested_at > indexed_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
+				//Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE harvested_at > indexed_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
+				Vector<Integer> vIDs = getIDsOfEntries(bAll ? "": "WHERE harvested_at > indexed_at");
 				Logger.status("updateIndex - begin (entries to update): " + vIDs.size());
 				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
 				{
@@ -1316,7 +1324,7 @@ public class Recommender extends DBThread
 		{
 			Statement st = cnRecommender.createStatement();
 			st.executeUpdate("UPDATE feeds SET entries_count = (SELECT count(*) FROM entries WHERE feed_id = feeds.id)");
-			st.executeUpdate("UPDATE languages SET indexed_records = (SELECT count(*) FROM entries WHERE entries.language = languages.code)");
+			st.executeUpdate("UPDATE languages SET indexed_records = (SELECT count(*) FROM entries WHERE entries.language_id = languages.id)");
 			st.close();
 		}
 		catch (SQLException e)
@@ -1410,7 +1418,7 @@ public class Recommender extends DBThread
 				{
 					EntryInfo entry = new EntryInfo();
 					entry.nEntryID = nEntryID;  
-					entry.sLanguage = sLanguage; 
+					entry.nLanguageID = htLanguagesToID.get(sLanguage); 
 					vEntries.add(entry);
 				}
 			}
@@ -1445,12 +1453,16 @@ public class Recommender extends DBThread
 		
 		// use the aggregator to get any new records
 		//boolean bChanges = Harvester.harvest();
+		
 		boolean bChanges=true;
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try
 		{
 			cnRecommender = getConnection("recommender");
+			
+			// get supported languages
+			getLanguageMappings(cnRecommender);
 			
 			createAnalyzers();
 			
@@ -1491,7 +1503,21 @@ public class Recommender extends DBThread
 		String sBody = Harvester.getLogMessages() + Logger.getMessages();
 		SendMail.sendMsg(sSMTPServer, sEmailFrom, sAdminEmail, sReportSubject, sBody);
 	}
-	
+	public void getLanguageMappings(Connection cn)
+    {
+    	try{
+    	PreparedStatement pstGetSupportLanguages=cn.prepareStatement("SELECT id, locale, is_default FROM languages where muck_raker_supported=1");
+    	ResultSet result=pstGetSupportLanguages.executeQuery();
+	    	while(result.next()){
+	    		Integer nLanguageID = result.getInt(1);
+	    		htIDToLanguages.put(nLanguageID,result.getString(2).substring(0,2));
+	    		htLanguagesToID.put(result.getString(2).substring(0,2),nLanguageID);
+	    	}
+    	}
+    	catch(Exception e){
+    		Logger.error("Read from table language");
+    	}
+    }
 	
 	public static void update(String sAction)
 	{

@@ -18,7 +18,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 	String sHarvestedFromTitle;
 	String sHarvestedFromShortTitle;
 	String sAuthor;
-	String sLanguage;
+    int nLanguageID;
 	int nLocalDocumentID;
 	int nRecommendationID;
 	
@@ -43,9 +43,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 		sTitle = rsEntries.getString("title");
 		sDescription = rsEntries.getString("description");
 		sTagList = rsEntries.getString("tag_list");
-		sLanguage = rsEntries.getString("language");
-		if (sLanguage == null || sLanguage.length() < 2) sLanguage = "en";
-		else sLanguage = sLanguage.toLowerCase().substring(0, 2);
+		nLanguageID = rsEntries.getInt("language_id");
 	}
 	public int compareTo(EntryInfo e){return this.lAvgTimeAtDest > e.lAvgTimeAtDest ? 1 : this.lAvgTimeAtDest == e.lAvgTimeAtDest ? 0 : -1;}
 }

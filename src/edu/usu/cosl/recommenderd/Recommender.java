@@ -1452,9 +1452,8 @@ public class Recommender extends DBThread
 		Logger.status("processDocuments - begin");
 		
 		// use the aggregator to get any new records
-		//boolean bChanges = Harvester.harvest();
-		
-		boolean bChanges=true;
+		boolean bChanges = Harvester.harvest();
+//		boolean bChanges=true;
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try

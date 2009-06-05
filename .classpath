@@ -38,7 +38,7 @@
 	<classpathentry kind="lib" path="lib/lucene-spellchecker-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
 	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.6.0_03"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregator"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregatord"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

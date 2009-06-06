@@ -57,17 +57,8 @@ public class Recommender extends DBThread
 	private PreparedStatement pstSetDocumentRecommendations;
 	private PreparedStatement pstDeleteEntryRecommendations;
 	private PreparedStatement pstDeleteEntry;
-	private PreparedStatement pstAddTags;
-	private PreparedStatement pstAddStemFreq;
-	private PreparedStatement pstUpdateTags;
-	private PreparedStatement pstGetTagName;
-	private PreparedStatement pstAddTagsEntries;
-	//private PreparedStatement sqlGetEntriesForTags;
-	private PreparedStatement pstFlagTagsEntries;
-	private PreparedStatement pstGenerateTags;
 	private PreparedStatement pstAddPersonalRec;
 	
-	private String sSolrDir = "solr/";
 	private CoreContainer mcore;
 	private Vector<SolrCore> vCores;
 	private Hashtable<String, Analyzer> htAnalyzers;
@@ -666,254 +657,257 @@ public class Recommender extends DBThread
             }
         }
     }
-	private void getNonStemTerms() {
+
+	private void getTagsAndStems() throws Exception
+	{
+		Logger.info("getTagsAndStems - begin");
 		
+		PreparedStatement pstGetTagName = cnRecommender.prepareStatement(
+			"SELECT id FROM tags WHERE name=? and frequency=?");
+
+		PreparedStatement pstAddTags = cnRecommender.prepareStatement(
+			"INSERT INTO tags (id, name, stem, frequency) " +
+			"VALUES (?, ?, ?, ?)");
+
+		PreparedStatement pstUpdateTags = cnRecommender.prepareStatement(
+			"UPDATE tags "+
+			"SET frequency =? " +
+			"where name = ? ");
 		
-		try {
-			Object[] languages=htReaders.keySet().toArray();
-			for(int i=0; i<languages.length;i++)
-			{
-				
-			//	s=htReaders.keySet().iterator().next().;
-				TagStemmer stemmer = new TagStemmer(languages[i].toString());
-				IndexReader reader = htReaders.get(languages[i].toString());
-				TermEnum te = reader.terms(new Term ("tag", ""));
-				int numoftags=0;
-				while (te.next()){
-					Term term = te.term();
-					int f = te.docFreq();
-					
-					if(f>0&&"tag".equals(te.term().field()))
+		// loop though all of the languages
+		Object[] languages=htReaders.keySet().toArray();
+		for(int nLanguage=0; nLanguage<languages.length; nLanguage++)
+		{
+			// get a stemmer for the language
+			TagStemmer stemmer = new TagStemmer(languages[nLanguage].toString());
+			IndexReader reader = htReaders.get(languages[nLanguage].toString());
+			
+			// get the unstemmed terms from lucene
+			// (the tag field we use to index terms without stemming)
+			TermEnum terms = reader.terms(new Term ("tag", ""));
+			int nNumTags = 0;
+			while (terms.next()){
+				Term term = terms.term();
+
+				// sometimes Lucene gives us terms not from the tag field
+				if ("tag".equals(term.field())) {
+					int nTermDocFrequency = terms.docFreq();
+					if (nTermDocFrequency > 0)
 					{
-						numoftags++;
-						String output=term.text().toString();
-						pstGetTagName.setString(1, output);
-						pstGetTagName.setInt(2, f);
+						nNumTags++;
+						String sTerm = term.text().toString();
+
+						// see if we already have that term in the db
+						pstGetTagName.setString(1, sTerm);
+						pstGetTagName.setInt(2, nTermDocFrequency);
 						ResultSet res=pstGetTagName.executeQuery();
-						if(res.next())
-						{
-							pstUpdateTags.setInt(1, f);
-							pstUpdateTags.setString(2, output);
+						if (res.next()) {
+							pstUpdateTags.setInt(1, nTermDocFrequency);
+							pstUpdateTags.setString(2, sTerm);
 							pstUpdateTags.addBatch();
 							
 						}
-						else
-						{
+						// we have to add the term
+						else {
 							pstAddTags.setInt(1, 0);
-							pstAddTags.setString(2, output);
-							pstAddTags.setString(3, stemmer.getStem(output));
-							pstAddTags.setInt(4, f);
+							pstAddTags.setString(2, sTerm);
+							pstAddTags.setString(3, stemmer.getStem(sTerm));
+							pstAddTags.setInt(4, nTermDocFrequency);
 							pstAddTags.addBatch();
-							
 						}
-						
-						if (numoftags%1000==0)
-						{
+						// every 1000 we execute the db updates
+						if (nNumTags % 1000 == 0) {
 							pstAddTags.executeBatch();
 							pstUpdateTags.executeBatch();
-							Logger.status("WriteTagstoDB: " + numoftags);
-							
+							Logger.status("WriteTagstoDB: " + nNumTags);
 						}
-						
-						
-						
 					}
-					
-				}
-				if (numoftags%1000!=0)
-				{
-					pstAddTags.executeBatch();
-					pstUpdateTags.executeBatch();
-					Logger.status("WriteTagstoDB: " + numoftags);
-				}
-			}		
-		} catch (Exception e) {
-			Logger.info(e.toString());
-		}
-	}
-	private void getStemTerms() {
-		
-		
-		try {
-			//TagStemmer stemmer = new TagStemmer();
-			Object[] languages = htReaders.keySet().toArray();
-			for(int i=0; i<languages .length;i++)
+				}	
+			}
+			if (nNumTags % 1000 != 0) 
 			{
-				int numofstems=0;
-				IndexReader reader = htReaders.get(languages[i].toString());
+				pstAddTags.executeBatch();
+				pstUpdateTags.executeBatch();
+				Logger.status("WriteTagstoDB: " + nNumTags);
+			}
+		}
+		pstGetTagName.close();
+		pstAddTags.close();
+		pstUpdateTags.close();
+
+		Logger.info("getTagsAndStems - end");
+	}
+	
+	private void updateStemFrequencies() throws Exception
+	{
+		Logger.info("updateStemFrequences - begin");
+		
+		PreparedStatement pstAddStemFreq = cnRecommender.prepareStatement(
+			"UPDATE tags SET stem_frequency = ? where stem = ? ");
+		
+		// loop through the languages we support
+		Object[] languages = htReaders.keySet().toArray();
+		for (int i=0; i<languages .length;i++)
+		{
+			// loop through all of the stems in our index
+			int nNumStems = 0;
+			IndexReader reader = htReaders.get(languages[i].toString());
+			TermEnum te = reader.terms(new Term ("text", ""));
+			while (te.next()){
+				Term term = te.term();
 				
-				TermEnum te = reader.terms(new Term ("text", ""));
-				while (te.next()){
-					Term term = te.term();
-					int f = te.docFreq();
-					if(f>0&&"text".equals(te.term().field()))
+				// sometimes Lucene gives us terms from other fields
+				if ("text".equals(term.field())) {
+					int nTermDocFrequency = te.docFreq();
+					if (nTermDocFrequency > 0)
 					{
-						numofstems++;
-						String output=term.text().toString();
-						pstAddStemFreq.setInt(1, f);
-						pstAddStemFreq.setString(2, output);
+						nNumStems++;
+						String sTerm = term.text().toString();
+						
+						// update the term frequency in the db
+						pstAddStemFreq.setInt(1, nTermDocFrequency);
+						pstAddStemFreq.setString(2, sTerm );
 						pstAddStemFreq.addBatch();
-						if ("a".equals(output.toString()))
-						{
-							Logger.status("get it");
-						}
-						if (numofstems%1000==0)
+						
+						if (nNumStems%1000 == 0)
 						{
 							pstAddStemFreq.executeBatch();
-							Logger.status("WriteStemstoDB: " + numofstems);
+							Logger.status("WriteStemstoDB: " + nNumStems);
 							
 						}
-						
 					}
-					
-				}
-				if(numofstems%1000!=0)
-				{
-					pstAddStemFreq.executeBatch();
-					Logger.status("WriteStemstoDB: " + numofstems);
 				}
 			}
-		
-		} catch (Exception e) {
-			Logger.info(e.toString());
-		}
-	}
-	private void generateTagsEntries() {
-	    try
-	    {
-	    	Object[] languages = htReaders.keySet().toArray();
-	    	for(int j=0; j<languages.length;j++)
+			if(nNumStems%1000!=0)
 			{
-		    	IndexReader reader = htReaders.get(languages[j].toString());
-		    	int num=0;
-		    	int numofdoc=reader.numDocs();
-		    	//sqlAdd
-		    	pstAddTagsEntries=cnRecommender.prepareStatement(
-		    			"INSERT INTO entries_tags (entry_id, tag_id) "+
-		    			"VALUES (?,?) ");
-		    	pstFlagTagsEntries=cnRecommender.prepareStatement(
-		    			"SELECT * FROM entries_tags where entry_id=? AND tag_id=?");
-		    	
-		    	while(num<numofdoc)
-		    	{
-		    		Statement sqlGetEntriesForTags=cnRecommender.createStatement();
-		    		TermFreqVector termFreqVector = reader.getTermFreqVector(num, "text");
-		    	    Document doc=reader.document(num);
-		    	    int entryid=Integer.parseInt(doc.getField("id").stringValue().substring(6));
-		    	    if (termFreqVector!=null)
-		    	    {
-		    	    	String[] terms=termFreqVector.getTerms();
-		    	    	String termlist="\""+terms[0]+"\""; 
-		    	    	for(int i=1;i<terms.length;i++)
-		    	    	{
-		    	    		termlist=termlist+","+"\""+terms[i]+"\"";
-		    	    	}
-		    	    	ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery("SELECT id FROM tags WHERE root=1 AND stem in (" +
-		    	    			termlist + ")");
-		    	    	while(rootIdindex.next())
-		    	    	{
-		    	    		int rootid=rootIdindex.getInt(1);
-		    	    		pstAddTagsEntries.setInt(1, entryid);
-		    	    		pstAddTagsEntries.setInt(2, rootid);
-		    	    		pstAddTagsEntries.addBatch();
-		    	    		
-		    	    	}
-		    	    	
-		    	    	/*for(int i=0;i<terms.length;i++)
-		    	    	{
-		    	    		sqlGetEntriesForTags.setString(1, terms[i]);
-		    	    		ResultSet rootIdindex=sqlGetEntriesForTags.executeQuery();
-		    	    		sqlGetEntriesForTags.clearParameters();
-		    	    		int rootid;
-		    	    		rootIdindex.next();
-		    	    		rootid=rootIdindex.getInt(1);
-		    	    		sqlFlagTagsEntries.setInt(1, entryid);
-		    	    		sqlFlagTagsEntries.setInt(2, rootid);
-		    	    		ResultSet flagofexists=sqlFlagTagsEntries.executeQuery();
-		    	    		if(!flagofexists.next())
-		    	    		{
-			    	    		sqlAddTagsEntries.setInt(1, entryid);
-			    	    		sqlAddTagsEntries.setInt(2, rootid);
-			    	    		sqlAddTagsEntries.addBatch();
-		    	    		}
-		    	    	}*/
-		    	    	pstAddTagsEntries.executeBatch();
-		    	    	
-		    	    }
-		    	    sqlGetEntriesForTags.close();
-		    		if(num%100==0)
-		    		{
-		    			Logger.status("WriteintoTagsEntries"+num);
-		    		}
-		    		num++;
-		    	}
-		    	if(num%100!=0)
-		    	{
-			    	//sqlAddTagsEntries.executeBatch();
-					Logger.status("WriteintoTagsEntries"+num);
-		    	}
-		    	pstAddTagsEntries.close();
-		    	pstFlagTagsEntries.close();
+				pstAddStemFreq.executeBatch();
+				Logger.status("WriteStemstoDB: " + nNumStems);
 			}
-	    }
-	    catch (Exception e)
-	    {
-	    	Logger.info(e.toString());
-	    }
+		}
+		pstAddStemFreq.close();
+
+		Logger.info("updateStemFrequences - end");
+	}
+	
+	private void tagEntries() throws Exception
+	{
+		Logger.info("tagEntries - begin");
+
+		PreparedStatement pstAddTagsEntries=cnRecommender.prepareStatement(
+	    			"INSERT INTO taggings (tag_id, taggable_id, taggable_type, context) VALUES (?, ?, 'Entry', 'tags') ");
+		Statement stGetTaggedEntries=cnRecommender.createStatement();
+
+		// loop through the indexes for the languages we support
+    	Object[] languages = htReaders.keySet().toArray();
+    	for(int nLanguage = 0; nLanguage < languages.length; nLanguage++)
+		{
+    		// loop through the documents in the index
+    		IndexReader reader = htReaders.get(languages[nLanguage].toString());
+	    	int nDoc = 0;
+	    	int nNumDocs = reader.numDocs();
+	    	while (nDoc < nNumDocs)
+	    	{
+	    		// get the term vector for the document
+	    		TermFreqVector termFreqVector = reader.getTermFreqVector(nDoc, "text");
+	    	    if (termFreqVector!=null)
+	    	    {
+		    		// get the ID of the document
+		    		Document doc=reader.document(nDoc);
+		    	    int nEntryId = Integer.parseInt(doc.getField("id").stringValue().substring(6));
+
+		    	    // build a comma delimited list of the terms
+		    	    String[] asTerms = termFreqVector.getTerms();
+	    	    	String sTermList="\""+asTerms[0]+"\""; 
+	    	    	for(int i=1; i<asTerms.length;i++)
+	    	    	{
+	    	    		sTermList = sTermList+","+"\""+asTerms[i]+"\"";
+	    	    	}
+	    	    	// loop through all entries that map to the root tag
+	    	    	// TODO: Protect this against SQL injection
+	    	    	// TODO: Consider replacing this with lucene queries instead of to the db
+	    	    	ResultSet rsTags = stGetTaggedEntries.executeQuery("SELECT id FROM tags WHERE root=1 AND stem IN (" + sTermList + ")");
+	    	    	while (rsTags.next())
+	    	    	{
+		    	    	// map the entry to the tag 
+	    	    		int nTagId = rsTags.getInt(1);
+	    	    		pstAddTagsEntries.setInt(1, nTagId);
+	    	    		pstAddTagsEntries.setInt(2, nEntryId);
+	    	    		pstAddTagsEntries.addBatch();
+	    	    	}
+	    	    	pstAddTagsEntries.executeBatch();
+	    	    }
+	    		nDoc++;
+	    		if (nDoc%100 == 0) {
+	    			Logger.status("Tagged entries: " + nDoc);
+	    		}
+	    	}
+		}
+	    stGetTaggedEntries.close();
+    	pstAddTagsEntries.close();
+
+    	Logger.info("tagEntries - end");
+	}
+	
+	private void flagRootWords() throws Exception
+	{
+		Logger.info("flagRootWords - begin");
+
+		// flag the most frequently used words as root words (kludge)
+		Statement stFlagRootWords = cnRecommender.createStatement();
+
+		// finds the terms with the max frequency and flags them as root words
+		stFlagRootWords.execute("UPDATE tags, "+
+				"(SELECT a.id, a.name, (SELECT max(frequency) "+
+				"FROM tags WHERE a.stem = stem AND a.frequency >= frequency) AS frequency, a.stem, "+
+				"NOT EXISTS (SELECT id FROM tags WHERE a.stem=stem AND a.frequency < frequency) AS root FROM tags a) c " +
+				"SET tags.root = c.root WHERE tags.id=c.id ");
+		
+		// the longest of the terms that collapses to a common stem is the word we will use as the root
+		stFlagRootWords.execute("UPDATE tags, (SELECT id FROM tags WHERE root = 1 GROUP BY stem ORDER BY length(name)) b SET tags.root = null WHERE tags.root=1 AND tags.id = b.id");
+
+		// flag all of the shorter terms to not be root terms
+		stFlagRootWords.execute("UPDATE tags SET root=0 WHERE root=1");
+
+		// finally the ones we previously set to null as root terms
+		stFlagRootWords.execute("UPDATE tags SET root=1 WHERE root IS NULL");
+		stFlagRootWords.close();
+		
+		Logger.info("flagRootWords - end");
 	}
 
 	private void updateTags()
 	{
+		Logger.status("Update tags - begin");
 		try
 		{
 			createIndexReaders();
 			createIndexSearchers();
-			pstGetTagName =cnRecommender.prepareStatement(
-					"SELECT id FROM tags WHERE name=? and frequency=?");
-			pstAddTags = cnRecommender.prepareStatement(
-					"INSERT INTO tags (id, name, stem, frequency) " +
-					"VALUES (?, ?, ?, ?)");
-			pstUpdateTags = cnRecommender.prepareStatement(
-					"UPDATE tags "+
-					"SET frequency =? " +
-					"where name = ? "
-					);
-			getNonStemTerms();
-			pstAddStemFreq =cnRecommender.prepareStatement(
-                    "UPDATE tags SET stem_frequency = ? where stem = ? ");
-			getStemTerms();
-			pstGenerateTags =cnRecommender.prepareStatement(
-					"UPDATE tags,"+
-					"(SELECT a.id, a.name,(SELECT max(frequency) "+
-					"FROM tags WHERE a.stem=stem AND a.frequency>=frequency) AS frequency, a.stem,"+
-					"NOT EXISTS (SELECT id FROM tags WHERE a.stem=stem AND a.frequency<frequency) AS root FROM tags a) c " +
-					"SET tags.root=c.root WHERE tags.id=c.id ");
-			pstGenerateTags.executeUpdate();
-			Statement sqlMinLenName=cnRecommender.createStatement(); 
-			sqlMinLenName.execute("UPDATE tags, (SELECT id FROM tags WHERE root=1 GROUP BY stem ORDER BY length(name))b SET tags.root=null WHERE tags.root=1 AND tags.id =b.id");
-			Statement sqlZeroMinLenName=cnRecommender.createStatement(); 
-			sqlZeroMinLenName.execute("UPDATE tags SET root=0 WHERE root=1");
-			Statement sqlFlagMinLenName=cnRecommender.createStatement(); 
-			sqlFlagMinLenName.execute("UPDATE tags SET root=1 WHERE root IS NULL");
-			generateTagsEntries();
-			pstGetTagName.close();
-			pstAddTags.close();
-			pstUpdateTags.close();
-			pstAddStemFreq.close();
-			pstGenerateTags.close();
-			sqlMinLenName.close();
-			sqlZeroMinLenName.close();
-			sqlFlagMinLenName.close();
-		    closeIndexSearchers();
+			
+			// get the list of all documents that were added / updated
+			// get the tags that were applied to those documents
+			// store those taggings in the database
+			// update the tag frequencies
+
+			getTagsAndStems();
+
+			updateStemFrequencies();
+			
+			flagRootWords();
+			
+			tagEntries();
+			
+			closeIndexSearchers();
 		    closeIndexReaders();
 		}
-		catch (Exception e)
-		{
+		catch (Exception e) {
 			Logger.error("updateTags - ", e);
 		}
+		Logger.status("Update tags - end");
 	}
 	private void updateQueries()
 	{
+		Logger.info("updateQueries - begin");
+
 		try
 		{
 			Statement stSubjectFreq=cnRecommender.createStatement();
@@ -964,7 +958,7 @@ public class Recommender extends DBThread
 		{
 			Logger.error("updateQueries - ", e);
 		}
-		
+		Logger.info("updateQueries - end");
 	}
 
 	private void indexEntry(EntryInfo entry) throws Exception 
@@ -1188,8 +1182,6 @@ public class Recommender extends DBThread
 			// get some options out of it
 	        String sValue = properties.getProperty("max_recommendations");
 	        if (sValue != null) nMaxRecommendations = Integer.parseInt(sValue);
-	        sValue = properties.getProperty("solr_dir");
-	        if (sValue != null) sSolrDir = sValue;
 	        sValue = properties.getProperty("smtp_server");
 	        if (sValue != null) sSMTPServer = sValue;
 	        sValue = properties.getProperty("admin_email");
@@ -1202,25 +1194,8 @@ public class Recommender extends DBThread
 	
 	private void initMultiCore() throws Exception 
 	{
-		// since SolrDispatchFilter can be derived & initMultiCore can be overriden
 		org.apache.solr.core.CoreContainer.Initializer initializer = new org.apache.solr.core.CoreContainer.Initializer();
-		initializer.setSolrConfigFilename(sSolrDir + File.separatorChar + "solr.xml");
 		mcore = initializer.initialize();
-		File fconf = new File(sSolrDir, "solr.xml");
-		Logger.info("looking for solr.xml: " + fconf.getAbsolutePath());
-		mcore.load(sSolrDir, fconf);
-	
-//		if (mcore.isEnabled())  
-//		{
-//			Logger.info("Using existing multicore configuration");
-//		} 
-//		else 
-//		{
-			// multicore load
-//			File fconf = new File(sSolrDir, "solr.xml");
-//			Logger.info("looking for solr.xml: " + fconf.getAbsolutePath());
-//			mcore.load(sSolrDir, fconf);
-//		}
 	}
 
 	private void closeCores()
@@ -1445,14 +1420,15 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	private void processDocuments(boolean bRedoAllRecommendations, boolean bReIndexAll)
+	private void processDocuments(boolean bNoHarvest, boolean bRedoAllRecommendations, boolean bReIndexAll)
 	{
 		loadOptions();
 
 		Logger.status("processDocuments - begin");
 		
 		// use the aggregator to get any new records
-		boolean bChanges = Harvester.harvest();
+		boolean bChanges = true;
+		if (!bNoHarvest) bChanges = Harvester.harvest();
 //		boolean bChanges=true;
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
@@ -1464,7 +1440,7 @@ public class Recommender extends DBThread
 			getLanguageMappings(cnRecommender);
 			
 			createAnalyzers();
-			
+/*			
 			// update indexes and db for deleted records (OAI)
 			updateForDeletedEntries(bRedoAllRecommendations);
 				
@@ -1478,13 +1454,13 @@ public class Recommender extends DBThread
 			updatePersonalRecommendations(bRedoAllRecommendations);
 			
 			// update tag lists
-			if (bChanges) updateTags();
+			if (bChanges) */updateTags();
 			if (bChanges) updateQueries();
 			
 			// close the lucene indexes
 			closeCores();
 			
-			if (bChanges) updateLanguageRecordCounts();
+//			if (bChanges) updateLanguageRecordCounts();
 			
 			cnRecommender.close();
 		}
@@ -1520,7 +1496,7 @@ public class Recommender extends DBThread
 	
 	public static void update(String sAction)
 	{
-		new Recommender().processDocuments("full".equals(sAction), "reindex".equals(sAction));
+		new Recommender().processDocuments("noharvest".equals(sAction), "full".equals(sAction), "reindex".equals(sAction));
 	}
 	
 	public static void main(String[] args) 

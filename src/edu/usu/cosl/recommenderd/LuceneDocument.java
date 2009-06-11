@@ -22,29 +22,16 @@ public class LuceneDocument {
 	    doc.add(new Field("title", entry.sTitle, Field.Store.YES, Field.Index.NO));
 	    doc.add(new Field("collection", entry.sFeedShortTitle, Field.Store.YES, Field.Index.NO));
 	    
-	    /*String sText = 
-	    	entry.sTitle + " " + entry.sTitle + " " + entry.sTitle + " " +  
-	    	entry.sDescription + " " + 
-	    	entry.sTagList + " " + entry.sTagList;  */
-	    
-	    doc.add(new Field("text", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("text", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("text", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("text", entry.sDescription, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    String []subjects=entry.sTagList.split("\\|\\|\\|");
-	    for(int i=0;i<subjects.length;i++)
-	    {
-	    	doc.add(new Field("text", subjects[i], Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    }
-	  //  doc.add(new Field("tag", sText, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("tag", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("tag", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("tag", entry.sTitle, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    doc.add(new Field("tag", entry.sDescription, Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    for(int i=0;i<subjects.length;i++)
-	    {
-	    	doc.add(new Field("tag", subjects[i], Field.Store.NO, Field.Index.TOKENIZED, Field.TermVector.YES));
-	    }
+	    doc.add(new Field("text", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("text", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("text", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("text", entry.sDescription, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+
+	    // tag is an unstemmed field
+	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+	    doc.add(new Field("tag", entry.sDescription, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
 	    return doc;
 	  }
 	  catch (Exception e)

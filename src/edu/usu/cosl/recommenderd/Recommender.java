@@ -8,13 +8,13 @@ import java.sql.SQLException;
 
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.Arrays;
 import java.util.Vector;
 import java.util.Hashtable;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Collections;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.lang.Math;
 
@@ -26,7 +26,6 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermEnum;
 import org.apache.lucene.index.TermFreqVector;
 import org.apache.lucene.search.Hit;
 import org.apache.lucene.search.HitIterator;
@@ -59,6 +58,11 @@ public class Recommender extends DBThread
 	private PreparedStatement pstDeleteEntry;
 	private PreparedStatement pstAddPersonalRec;
 	
+	private PreparedStatement pstGetSubjectID;
+	private PreparedStatement pstAddSubject;
+	private PreparedStatement pstAddEntrySubject;
+	private int nNewEntrySubjects;
+	
 	private CoreContainer mcore;
 	private Vector<SolrCore> vCores;
 	private Hashtable<String, Analyzer> htAnalyzers;
@@ -68,8 +72,8 @@ public class Recommender extends DBThread
 	private int nMaxRecommendations = 20;
 	private String sSMTPServer = null;
 	private String sAdminEmail = null;
-	private Hashtable<Integer, String> htIDToLanguages = new Hashtable<Integer, String>();
-	private Hashtable<String, Integer> htLanguagesToID = new Hashtable<String, Integer>();
+	private Hashtable<Integer, String> htIDToLanguage = new Hashtable<Integer, String>();
+	private Hashtable<String, Integer> htLanguageToID = new Hashtable<String, Integer>();
 	private Logger log = new Logger();
 
 	static private String quoteEncode(String sText)
@@ -357,32 +361,26 @@ public class Recommender extends DBThread
 		try
 		{
 			// if we don't have an anlyzer for the language, bail
-			Analyzer analyzer = htAnalyzers.get(htIDToLanguages.get(entry.nLanguageID));
+			Analyzer analyzer = htAnalyzers.get(htIDToLanguage.get(entry.nLanguageID));
 		    if (analyzer == null) return vEntries;
 		    
 		    // find the lucene document for the entry
 			TermQuery query = new TermQuery(new Term("id","Entry:" + entry.nEntryID));
-			IndexSearcher searcher = htSearchers.get(htIDToLanguages.get(entry.nLanguageID));
+			IndexSearcher searcher = htSearchers.get(htIDToLanguage.get(entry.nLanguageID));
 		    Hits hits = searcher.search(query);
 		    int nDocID = hits.id(0);
 		    if (hits.length() == 0 || nDocID == 0) return vEntries;
 		    
 		    // ask lucene for more entries like this on
-		    IndexReader reader = htReaders.get(htIDToLanguages.get(entry.nLanguageID));
+		    IndexReader reader = htReaders.get(htIDToLanguage.get(entry.nLanguageID));
 		    MoreLikeThis mlt = new MoreLikeThis(reader);
 		    mlt.setMinTermFreq(1);
 		    mlt.setAnalyzer(analyzer);
 		    mlt.setFieldNames(new String[]{"text"});
-		    mlt.setMinWordLen(("zh".equals(htIDToLanguages.get(entry.nLanguageID)) || "ja".equals(htIDToLanguages.get(entry.nLanguageID))) ? 1 : 4);
+		    mlt.setMinWordLen(("zh".equals(htIDToLanguage.get(entry.nLanguageID)) || "ja".equals(htIDToLanguage.get(entry.nLanguageID))) ? 1 : 4);
 		    mlt.setMinDocFreq(2);
 		    mlt.setBoost(true);
 		    Query like = mlt.like(nDocID);
-		   // Logger.info("Query terms: " + like.toString().split("text:").length);
-		    //Logger.info(like.toString());
-//		    Logger.info("title: " + entry.sTitle);
-//		    Logger.info("description: " + entry.sDescription);
-//		    Logger.info("tag_list: " + entry.sTagList);
-//		    Logger.info(like.toString());
 		    Hits relatedDocs = searcher.search(like);
 		    
 			int nSameDomainHits = 0;
@@ -472,14 +470,17 @@ public class Recommender extends DBThread
 	
 	private void updateRecommendations(boolean bAll) throws SQLException
 	{
-		//Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE indexed_at > relevance_calculated_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
 		Vector<Integer> vIDs = getIDsOfEntries(bAll ? "":"WHERE indexed_at > relevance_calculated_at");
-		Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
-		updateRecommendations(vIDs);
-		Logger.status("updateRecommendations - end");
+		if (vIDs.size() > 0) {
+			Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
+			updateRecommendations(vIDs);
+			Logger.status("updateRecommendations - end");
+		}
 	}
 	private void updatePersonalRecommendations(boolean bAll) throws SQLException
 	{
+		Logger.info("updatePersonalRecommendations-begin");
+		
 		Statement stTruncPersonalRec=cnRecommender.createStatement();
 		stTruncPersonalRec.executeQuery("TRUNCATE TABLE personal_recommendations");
 		//Join table attentions, action_type, recommendations to generate table personal_recommendations
@@ -494,12 +495,10 @@ public class Recommender extends DBThread
 		pstAddPersonalRec.execute();
 		pstAddPersonalRec.close();
 		
-		
+		Logger.info("updatePersonalRecommendations-end");
 	}
 	private void updateRecommendations(Vector<Integer> vIDs)
 	{
-		if (vIDs.size() == 0) return;
-
 		cleanupIndex();
 		
 		try
@@ -531,7 +530,7 @@ public class Recommender extends DBThread
 					"UPDATE entries SET relevance_calculated_at = now() WHERE id = ?");
 		
 				PreparedStatement pstEntryToCreateRecommendationsFor = cnRecommender.prepareStatement(
-					"SELECT id, feed_id, permalink, direct_link, title, description, tag_list, language_id " +
+					"SELECT id, feed_id, permalink, direct_link, title, description, language_id " +
 					"FROM entries WHERE id = ?");
 				
 				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
@@ -582,328 +581,286 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	
-	class TagStemmer extends org.apache.lucene.analysis.Tokenizer
-    {
-		private org.apache.solr.analysis.EnglishPorterFilterFactory factoryen;
-		private edu.usu.cosl.analysis.es.SpanishPorterFilterFactory factoryes;
-		private org.apache.solr.analysis.GermanStemFilterFactory factoryde;
-		private org.apache.solr.analysis.FrenchStemFilterFactory factoryfr;
-		private org.apache.solr.analysis.EnglishPorterFilterFactory factoryja;
-		private org.apache.solr.analysis.DutchStemFilterFactory factorynl;
-		private org.apache.solr.analysis.RussianStemFilterFactory factoryru;
-		private org.apache.solr.analysis.ChineseFilterFactory factoryzh;
-        private org.apache.lucene.analysis.Token token;
-        private org.apache.lucene.analysis.TokenStream tokenStream;
-        
-        public TagStemmer(String language) 
-        {
-        	if("en".equals(language))
-        	{
-        		factoryen = new org.apache.solr.analysis.EnglishPorterFilterFactory();
-        		tokenStream = factoryen.create(this);
-        	}
-        	else if("es".equals(language))
-        	{
-        		factoryes = new edu.usu.cosl.analysis.es.SpanishPorterFilterFactory();
-        		tokenStream = factoryes.create(this);
-        	}
-        	else if("de".equals(language))
-        	{
-        		factoryde=new org.apache.solr.analysis.GermanStemFilterFactory();
-        		tokenStream = factoryde.create(this);
-        	}
-        	else if("fr".equals(language))
-        	{
-        		factoryfr=new org.apache.solr.analysis.FrenchStemFilterFactory();
-        		tokenStream = factoryfr.create(this);
-        	}
-        	else if("ja".equals(language))
-        	{
-        		factoryja = new org.apache.solr.analysis.EnglishPorterFilterFactory();
-        		tokenStream = factoryja.create(this);
-        	    	
-        	}
-        	else if("nl".equals(language))
-        	{
-        		factorynl = new org.apache.solr.analysis.DutchStemFilterFactory();
-        		tokenStream = factorynl.create(this);
-        	}
-        	else if("ru".equals(language))
-        	{
-        		factoryru = new org.apache.solr.analysis.RussianStemFilterFactory();
-        		tokenStream = factoryru.create(this);
-        	}
-        	else if("zh".equals(language))
-        	{
-        		tokenStream = new org.apache.solr.analysis.ChineseFilterFactory().create(this);
-        	}
-        	token = new org.apache.lucene.analysis.Token();
-        	
-        }
-        public org.apache.lucene.analysis.Token next()
-        {
-            return token; 
-        }
-        @SuppressWarnings("deprecation")
-		public String getStem(String sTerm)
-        {
-        	token.setTermText(sTerm);
-            try {
-            	return tokenStream.next().termText();
-            } catch (java.io.IOException e) {
-                Logger.error(e);
-                return sTerm;
-            }
-        }
-    }
-
-	private void getTagsAndStems() throws Exception
+	class TermFrequency implements Comparable 
 	{
-		Logger.info("getTagsAndStems - begin");
+		String sTerm;
+		int nFrequency;
+		boolean bSortOnName;
 		
-		PreparedStatement pstGetTagName = cnRecommender.prepareStatement(
-			"SELECT id FROM tags WHERE name=? and frequency=?");
-
-		PreparedStatement pstAddTags = cnRecommender.prepareStatement(
-			"INSERT INTO tags (id, name, stem, frequency) " +
-			"VALUES (?, ?, ?, ?)");
-
-		PreparedStatement pstUpdateTags = cnRecommender.prepareStatement(
-			"UPDATE tags "+
-			"SET frequency =? " +
-			"where name = ? ");
-		
-		// loop though all of the languages
-		Object[] languages=htReaders.keySet().toArray();
-		for(int nLanguage=0; nLanguage<languages.length; nLanguage++)
-		{
-			// get a stemmer for the language
-			TagStemmer stemmer = new TagStemmer(languages[nLanguage].toString());
-			IndexReader reader = htReaders.get(languages[nLanguage].toString());
-			
-			// get the unstemmed terms from lucene
-			// (the tag field we use to index terms without stemming)
-			TermEnum terms = reader.terms(new Term ("tag", ""));
-			int nNumTags = 0;
-			while (terms.next()){
-				Term term = terms.term();
-
-				// sometimes Lucene gives us terms not from the tag field
-				if ("tag".equals(term.field())) {
-					int nTermDocFrequency = terms.docFreq();
-					if (nTermDocFrequency > 0)
-					{
-						nNumTags++;
-						String sTerm = term.text().toString();
-
-						// see if we already have that term in the db
-						pstGetTagName.setString(1, sTerm);
-						pstGetTagName.setInt(2, nTermDocFrequency);
-						ResultSet res=pstGetTagName.executeQuery();
-						if (res.next()) {
-							pstUpdateTags.setInt(1, nTermDocFrequency);
-							pstUpdateTags.setString(2, sTerm);
-							pstUpdateTags.addBatch();
-							
-						}
-						// we have to add the term
-						else {
-							pstAddTags.setInt(1, 0);
-							pstAddTags.setString(2, sTerm);
-							pstAddTags.setString(3, stemmer.getStem(sTerm));
-							pstAddTags.setInt(4, nTermDocFrequency);
-							pstAddTags.addBatch();
-						}
-						// every 1000 we execute the db updates
-						if (nNumTags % 1000 == 0) {
-							pstAddTags.executeBatch();
-							pstUpdateTags.executeBatch();
-							Logger.status("WriteTagstoDB: " + nNumTags);
-						}
-					}
-				}	
-			}
-			if (nNumTags % 1000 != 0) 
-			{
-				pstAddTags.executeBatch();
-				pstUpdateTags.executeBatch();
-				Logger.status("WriteTagstoDB: " + nNumTags);
-			}
+		public TermFrequency(String sTerm, int nFrequency) {
+			this(sTerm,nFrequency,false);
 		}
-		pstGetTagName.close();
-		pstAddTags.close();
-		pstUpdateTags.close();
-
-		Logger.info("getTagsAndStems - end");
+		public TermFrequency(String sTerm, int nFrequency, boolean bSortOnName) {
+			this.sTerm = sTerm;
+			this.nFrequency = nFrequency;
+			this.bSortOnName = bSortOnName;
+		}
+		private int compareNames(Object o) {
+			return sTerm.compareTo(((TermFrequency)o).sTerm);
+		}
+		public int compareFrequencies(Object o) {
+			int nOtherFreq = ((TermFrequency)o).nFrequency;
+			if (nOtherFreq == nFrequency) return 0;
+			else if (nOtherFreq < nFrequency) return -1;
+			else return 1;
+		}
+		public int compareTo(Object o) {
+			if (bSortOnName) return compareNames(o);
+			else return compareFrequencies(o);
+		}
 	}
 	
-	private void updateStemFrequencies() throws Exception
+	private void autoGenerateSubjects(HashSet hsSubjects, int nEntryID, int nSubjects, IndexReader reader, IndexSearcher searcher)
 	{
-		Logger.info("updateStemFrequences - begin");
+		try {
+			// find the document
+			TermQuery query = new TermQuery(new Term("id", "Entry:" + nEntryID));
+		    Hits hits = searcher.search(query);
+		    if (hits.length() > 0) 
+		    {
+				// get its unstemmed terms
+			    int nDocID = hits.id(0);
+	    		TermFreqVector tfv = reader.getTermFreqVector(nDocID, "tag");
+	    	    if (tfv != null)
+	    	    {
+		    	    String[] asTerms = tfv.getTerms();
+		    	    int[] anFrequencies = tfv.getTermFrequencies();
+		    	    TermFrequency[] atf = new TermFrequency[asTerms.length];
+	    	    	for (int nTerm = 0; nTerm < asTerms.length; nTerm++) {
+	    	    		atf[nTerm] = new TermFrequency(asTerms[nTerm], anFrequencies[nTerm]);
+	    	    	}
+	    	    	Arrays.sort(atf);
+
+	    	    	for (int nTerm = 0; nTerm < asTerms.length && nSubjects < 5 && atf[nTerm].nFrequency > 2; nTerm++)
+	    	    	{
+	    	    		nSubjects += addEntrySubject(hsSubjects, nEntryID, atf[nTerm].sTerm);
+	    	    	}
+	    	    }
+		    }
+		} catch (Exception e) {
+			Logger.error("autoGenerateSubjects-error: ", e);
+		}
+	}
+	
+	private int addEntrySubject(HashSet hsSubjects, int nEntryID, String sSubject) throws SQLException
+	{
+		int nAddedSubjects = 0;
 		
-		PreparedStatement pstAddStemFreq = cnRecommender.prepareStatement(
-			"UPDATE tags SET stem_frequency = ? where stem = ? ");
-		
-		// loop through the languages we support
-		Object[] languages = htReaders.keySet().toArray();
-		for (int i=0; i<languages .length;i++)
+		// TODO: use the version of this method that takes a locale
+		sSubject = sSubject.toLowerCase();
+		if (sSubject.length() > 0)
 		{
-			// loop through all of the stems in our index
-			int nNumStems = 0;
-			IndexReader reader = htReaders.get(languages[i].toString());
-			TermEnum te = reader.terms(new Term ("text", ""));
-			while (te.next()){
-				Term term = te.term();
-				
-				// sometimes Lucene gives us terms from other fields
-				if ("text".equals(term.field())) {
-					int nTermDocFrequency = te.docFreq();
-					if (nTermDocFrequency > 0)
-					{
-						nNumStems++;
-						String sTerm = term.text().toString();
-						
-						// update the term frequency in the db
-						pstAddStemFreq.setInt(1, nTermDocFrequency);
-						pstAddStemFreq.setString(2, sTerm );
-						pstAddStemFreq.addBatch();
-						
-						if (nNumStems%1000 == 0)
-						{
-							pstAddStemFreq.executeBatch();
-							Logger.status("WriteStemstoDB: " + nNumStems);
-							
-						}
+			String[] asSubjects = sSubject.split("--|[:;,\\)(/\".]");
+			for (int nSubject = 0; nSubject < asSubjects.length; nSubject++)
+			{
+				String sNormalizedSubject = asSubjects[nSubject].trim();
+				if (sNormalizedSubject.length() > 0 && !hsSubjects.contains(sNormalizedSubject)) {
+					pstAddEntrySubject.setInt(1, getSubjectID(sNormalizedSubject));
+					pstAddEntrySubject.setInt(2, nEntryID);
+					pstAddEntrySubject.addBatch();
+					nNewEntrySubjects++;
+					if (nNewEntrySubjects > 100) {
+						pstAddEntrySubject.executeBatch();
+						nNewEntrySubjects = 0;
 					}
+					nAddedSubjects++;
 				}
 			}
-			if(nNumStems%1000!=0)
-			{
-				pstAddStemFreq.executeBatch();
-				Logger.status("WriteStemstoDB: " + nNumStems);
-			}
 		}
-		pstAddStemFreq.close();
-
-		Logger.info("updateStemFrequences - end");
+		return nAddedSubjects;
 	}
 	
-	private void tagEntries() throws Exception
+	private int getSubjectID(String sSubject) throws SQLException
 	{
-		Logger.info("tagEntries - begin");
+		// set up the prepared statement
+		pstGetSubjectID.setString(1, sSubject);
+		
+		// do the query
+		ResultSet rs = pstGetSubjectID.executeQuery();
+		
+		// if the subject isn't already in the database, add it now
+		int nSubjectID = 0;
+		if (!rs.next()) nSubjectID = addSubject(sSubject);
+		
+		// return the subject's id
+		else nSubjectID = rs.getInt(1);
 
-		PreparedStatement pstAddTagsEntries=cnRecommender.prepareStatement(
-	    			"INSERT INTO taggings (tag_id, taggable_id, taggable_type, context) VALUES (?, ?, 'Entry', 'tags') ");
-		Statement stGetTaggedEntries=cnRecommender.createStatement();
-
-		// loop through the indexes for the languages we support
-    	Object[] languages = htReaders.keySet().toArray();
-    	for(int nLanguage = 0; nLanguage < languages.length; nLanguage++)
-		{
-    		// loop through the documents in the index
-    		IndexReader reader = htReaders.get(languages[nLanguage].toString());
-	    	int nDoc = 0;
-	    	int nNumDocs = reader.numDocs();
-	    	while (nDoc < nNumDocs)
-	    	{
-	    		// get the term vector for the document
-	    		TermFreqVector termFreqVector = reader.getTermFreqVector(nDoc, "text");
-	    	    if (termFreqVector!=null)
-	    	    {
-		    		// get the ID of the document
-		    		Document doc=reader.document(nDoc);
-		    	    int nEntryId = Integer.parseInt(doc.getField("id").stringValue().substring(6));
-
-		    	    // build a comma delimited list of the terms
-		    	    String[] asTerms = termFreqVector.getTerms();
-	    	    	String sTermList="\""+asTerms[0]+"\""; 
-	    	    	for(int i=1; i<asTerms.length;i++)
-	    	    	{
-	    	    		sTermList = sTermList+","+"\""+asTerms[i]+"\"";
-	    	    	}
-	    	    	// loop through all entries that map to the root tag
-	    	    	// TODO: Protect this against SQL injection
-	    	    	// TODO: Consider replacing this with lucene queries instead of to the db
-	    	    	ResultSet rsTags = stGetTaggedEntries.executeQuery("SELECT id FROM tags WHERE root=1 AND stem IN (" + sTermList + ")");
-	    	    	while (rsTags.next())
-	    	    	{
-		    	    	// map the entry to the tag 
-	    	    		int nTagId = rsTags.getInt(1);
-	    	    		pstAddTagsEntries.setInt(1, nTagId);
-	    	    		pstAddTagsEntries.setInt(2, nEntryId);
-	    	    		pstAddTagsEntries.addBatch();
-	    	    	}
-	    	    	pstAddTagsEntries.executeBatch();
-	    	    }
-	    		nDoc++;
-	    		if (nDoc%100 == 0) {
-	    			Logger.status("Tagged entries: " + nDoc);
-	    		}
-	    	}
-		}
-	    stGetTaggedEntries.close();
-    	pstAddTagsEntries.close();
-
-    	Logger.info("tagEntries - end");
+		rs.close();
+		return nSubjectID;
 	}
 	
-	private void flagRootWords() throws Exception
+	private int addSubject(String sSubject) throws SQLException
 	{
-		Logger.info("flagRootWords - begin");
-
-		// flag the most frequently used words as root words (kludge)
-		Statement stFlagRootWords = cnRecommender.createStatement();
-
-		// finds the terms with the max frequency and flags them as root words
-		stFlagRootWords.execute("UPDATE tags, "+
-				"(SELECT a.id, a.name, (SELECT max(frequency) "+
-				"FROM tags WHERE a.stem = stem AND a.frequency >= frequency) AS frequency, a.stem, "+
-				"NOT EXISTS (SELECT id FROM tags WHERE a.stem=stem AND a.frequency < frequency) AS root FROM tags a) c " +
-				"SET tags.root = c.root WHERE tags.id=c.id ");
-		
-		// the longest of the terms that collapses to a common stem is the word we will use as the root
-		stFlagRootWords.execute("UPDATE tags, (SELECT id FROM tags WHERE root = 1 GROUP BY stem ORDER BY length(name)) b SET tags.root = null WHERE tags.root=1 AND tags.id = b.id");
-
-		// flag all of the shorter terms to not be root terms
-		stFlagRootWords.execute("UPDATE tags SET root=0 WHERE root=1");
-
-		// finally the ones we previously set to null as root terms
-		stFlagRootWords.execute("UPDATE tags SET root=1 WHERE root IS NULL");
-		stFlagRootWords.close();
-		
-		Logger.info("flagRootWords - end");
+		pstAddSubject.setString(1, sSubject);
+		pstAddSubject.executeUpdate();
+		return getLastID(pstAddSubject);
 	}
-
-	private void updateTags()
+	
+	private int getLastID(Statement st) throws SQLException
 	{
-		Logger.status("Update tags - begin");
+		ResultSet rsLastID = st.executeQuery("SELECT LAST_INSERT_ID()");
 		try
 		{
-			createIndexReaders();
-			createIndexSearchers();
+			if (!rsLastID.next())
+			{
+				rsLastID.close();
+				throw new SQLException("Unable to retrieve the id for a newly added entry.");
+			}
+			int nLastID = rsLastID.getInt(1);
+			if (nLastID == 0)
+			{
+				rsLastID.close();
+				throw new SQLException("Unable to retrieve the id for a newly added entry.");
+			}
+			return nLastID;
+		}
+		catch (SQLException e)
+		{
+			if (rsLastID != null) rsLastID.close();
+			throw e;
+		}
+	}
+	
+	private void autoGenerateSubjectsForEntries() throws Exception
+	{
+		Logger.status("autoGenerateSubjectsForEntries - begin");
+		
+		PreparedStatement pstNukeOldAutoSubjects = cnRecommender.prepareStatement("DELETE FROM entries_subjects WHERE entry_id = ? AND autogenerated = true");
+		PreparedStatement psGetEntrySubjects = cnRecommender.prepareStatement("SELECT subjects.name FROM entries_subjects INNER JOIN subjects ON entries_subjects.subject_id = subjects.id WHERE entries_subjects.entry_id = ? LIMIT 5");
+		pstGetSubjectID = cnRecommender.prepareStatement("SELECT id FROM subjects WHERE name = ?");
+		pstAddSubject = cnRecommender.prepareStatement("INSERT INTO subjects (name) VALUES (?)");
+		pstAddEntrySubject = cnRecommender.prepareStatement("INSERT INTO entries_subjects (subject_id, entry_id, autogenerated) VALUES (?, ?, true)");
+		nNewEntrySubjects = 0;
+		
+		// loop through each of the indexes (languages)
+		for (Enumeration<SolrCore> eCores = vCores.elements(); eCores.hasMoreElements();) 
+		{
+			// get the core
+			SolrCore core = eCores.nextElement();
+			String sLanguageCode = core.getName();
 			
-			// get the list of all documents that were added / updated
-			// get the tags that were applied to those documents
-			// store those taggings in the database
-			// update the tag frequencies
+			// open a reader and searcher on the index 
+			IndexReader reader = IndexReader.open(FSDirectory.getDirectory(core.getIndexDir()));
+			IndexSearcher searcher = new IndexSearcher(reader);
+			
+			// ask the db for the entries that have been updated or added for the language
+			Vector<Integer> vIDs = getIDsOfEntries("WHERE indexed_at > relevance_calculated_at AND language_id = " + htLanguageToID.get(sLanguageCode));
+			Logger.info("Generating subjects for entries (" + sLanguageCode + "): " + vIDs.size());
+			for(Enumeration<Integer> eID = vIDs.elements(); eID.hasMoreElements();)
+			{
+				int nEntryID = eID.nextElement();
 
-			getTagsAndStems();
+				Logger.info("Generating subjects for entry id: " + nEntryID);
+				Logger.info("Nuking");
+				// delete any autogenerated subjects for this entry 
+				pstNukeOldAutoSubjects.setInt(1,nEntryID);
+				pstNukeOldAutoSubjects.executeUpdate();
 
-			updateStemFrequencies();
+				// for entries that don't have at least 5 subjects, generate some
+				psGetEntrySubjects.setInt(1, nEntryID);
+				ResultSet rsEntries = psGetEntrySubjects.executeQuery();
+				HashSet<String> hsSubjects = new HashSet<String>();
+				int nSubjects = 0;
+				while (rsEntries.next()) {
+					hsSubjects.add(rsEntries.getString(1));
+					nSubjects++;
+				}
+				rsEntries.close();
+				if (nSubjects < 5) {
+					autoGenerateSubjects(hsSubjects, nEntryID, nSubjects, reader, searcher);
+				}
+			}
+			// close the index searcher and reader
+			searcher.close();
+			reader.close();
+		}
+		psGetEntrySubjects.close();
+		pstNukeOldAutoSubjects.close();
+		if (nNewEntrySubjects > 0) {
+			pstAddEntrySubject.executeBatch();
+		}
+		pstGetSubjectID.close();
+		pstAddSubject.close();
+		pstAddEntrySubject.close();
+
+		Logger.status("autoGenerateSubjectsForEntries - end");
+	}
+	
+	PreparedStatement pstGetTagList;
+	
+	private String getTagListForLanguage(int nLanguageID, int nMaxTags) throws Exception
+	{
+		StringBuffer sbList = new StringBuffer(2500);
+		
+		// get the top tags and their frequencies
+		int nTags = 0;
+		TermFrequency[] atf = new TermFrequency[nMaxTags];
+		pstGetTagList.setInt(1,nLanguageID);
+		pstGetTagList.setInt(2,nMaxTags);
+		ResultSet rsTags = pstGetTagList.executeQuery();
+		double dMin = 100000;
+		double dMax = 0;
+		while (rsTags.next()) {
+			int nFreq = rsTags.getInt(2);
+			if (nFreq < dMin) dMin = nFreq;
+			if (nFreq > dMax) dMax = nFreq;
+			atf[nTags] = new TermFrequency(rsTags.getString(1), nFreq, true);
+			nTags++;
+		}
+		// sort the tags by frequency
+		Arrays.sort(atf, 0, nTags);
+		
+		// scale their frequencies and generate a list
+		double dTagRange = dMax - dMin;
+		final double dStyleRange = 5;
+		for (int nTag = 0; nTag < nTags; nTag++) {
+			TermFrequency tf = atf[nTag];
+			if (nTag > 0) sbList.append(",");
+			sbList.append(tf.sTerm);
+			sbList.append(",");
+			sbList.append(Math.round( ((double)tf.nFrequency - dMin)*dStyleRange/dTagRange ));
+		}
+		return sbList.toString();
+	}
+	
+	private void updateTagLists() throws Exception
+	{
+		pstGetTagList = cnRecommender.prepareStatement("SELECT s.name, count(*) AS count FROM entries_subjects AS es INNER JOIN subjects AS s ON es.subject_id = s.id INNER JOIN entries AS e ON es.entry_id = e.id WHERE e.language_id = ? GROUP BY es.subject_id ORDER BY count DESC LIMIT ?;");
+		PreparedStatement pstAddTagList = cnRecommender.prepareStatement("REPLACE INTO cloud_caches SET language_id = ?, filter = ?, tag_list = ?");
+
+		// loop through each of the languages
+		for (Enumeration<Integer>eLanguageIDs = htIDToLanguage.keys(); eLanguageIDs.hasMoreElements();)
+		{
+			int nLanguageID = eLanguageIDs.nextElement();
+			Logger.info("Generating tag cloud for language: " + htIDToLanguage.get(nLanguageID));
+			String sTagList = getTagListForLanguage(nLanguageID, 100);
+			if (sTagList.length() > 0) {
+				pstAddTagList.setInt(1, nLanguageID);
+				pstAddTagList.setString(2, "all");
+				pstAddTagList.setString(3, sTagList);
+				pstAddTagList.addBatch();
+			}
+		}
+		pstAddTagList.executeBatch();
+		pstAddTagList.close();
+		pstGetTagList.close();
+	}
+	
+	private void updateTagClouds()
+	{
+		Logger.status("Update tag clouds - begin");
+		try
+		{
+			autoGenerateSubjectsForEntries();
 			
-			flagRootWords();
-			
-			tagEntries();
-			
-			closeIndexSearchers();
-		    closeIndexReaders();
+			updateTagLists();
 		}
 		catch (Exception e) {
-			Logger.error("updateTags - ", e);
+			Logger.error("updateTagClouds-error: ", e);
 		}
-		Logger.status("Update tags - end");
+		Logger.status("Update tag clouds - end");
 	}
+
 	private void updateQueries()
 	{
 		Logger.info("updateQueries - begin");
@@ -911,7 +868,7 @@ public class Recommender extends DBThread
 		try
 		{
 			Statement stSubjectFreq=cnRecommender.createStatement();
-			ResultSet subjectFreq=stSubjectFreq.executeQuery("select subject_id, count(*) from entries_subjects group by subject_id");
+			ResultSet subjectFreq=stSubjectFreq.executeQuery("select subject_id, count(*) from taggings group by subject_id");
 			subjectFreq.last();
 			int num=subjectFreq.getRow();
 			subjectFreq.first();
@@ -926,9 +883,9 @@ public class Recommender extends DBThread
 		    }while(subjectFreq.next());
 			
 			PreparedStatement insertIntoQueries=cnRecommender.prepareStatement("Insert Into queries(name,frequency)"+
-					"values ((select name from subjects where subjects.id=?),?)");
+				"values ((select name from subjects where subjects.id=?),?)");
 			PreparedStatement searchSubsinQueries=cnRecommender.prepareStatement("SELECT queries.id,queries.frequency FROM queries, subjects "+
-			"where subjects.name=queries.name and subjects.id=?");
+				"where subjects.name=queries.name and subjects.id=?");
 			PreparedStatement updateIntoQueries=cnRecommender.prepareStatement("Update queries set frequency=? where id=?");
 			for(i=0;i<num;i++)
 			{
@@ -964,10 +921,10 @@ public class Recommender extends DBThread
 	private void indexEntry(EntryInfo entry) throws Exception 
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		Analyzer analyzer = htAnalyzers.get(htIDToLanguages.get(entry.nLanguageID));
+		Analyzer analyzer = htAnalyzers.get(htIDToLanguage.get(entry.nLanguageID));
 		if (analyzer != null)
 		{
-			htWriters.get(htIDToLanguages.get(entry.nLanguageID)).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
+			htWriters.get(htIDToLanguage.get(entry.nLanguageID)).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
 		}
 		pstFlagEntryIndexed.setInt(1, entry.nEntryID);
 		pstFlagEntryIndexed.addBatch();
@@ -984,14 +941,14 @@ public class Recommender extends DBThread
 		}
 		rsEntriesToIndex.close();
 		stEntriesToIndex.close();
-		Logger.info("Entries to process: " + vIDs.size());
+//		Logger.info("Entries to process: " + vIDs.size());
 		return vIDs;
 	}
 
 	private void removeEntryFromIndex(EntryInfo entry) throws Exception
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		htWriters.get(htIDToLanguages.get(entry.nLanguageID)).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
+		htWriters.get(htIDToLanguage.get(entry.nLanguageID)).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
 	}
 	
 	private void getIDsOfEntriesPointingAtEntry(Vector<Integer> vIDs, int nEntryID) throws SQLException
@@ -1097,7 +1054,7 @@ public class Recommender extends DBThread
 		
 				PreparedStatement pstEntryToIndex = cnRecommender.prepareStatement(
 						"SELECT entries.id, entries.feed_id, permalink, direct_link, entries.title, entries.description, " + 
-						"tag_list, entries.language_id, feeds.short_title AS collection " + 
+						"entries.language_id, feeds.short_title AS collection " + 
 						"FROM entries " +
 						"INNER JOIN feeds ON entries.feed_id = feeds.id " +
 						"WHERE entries.id = ?");
@@ -1163,8 +1120,12 @@ public class Recommender extends DBThread
         java.util.logging.Logger.getLogger(org.apache.solr.update.DirectUpdateHandler2.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.core.Config.class.getName()).setLevel(level);
         java.util.logging.Logger.getLogger(org.apache.solr.update.UpdateHandler.class.getName()).setLevel(level);
-        
 	}
+	
+	private boolean bTest = false;
+	private boolean bNoHarvest = false;
+	private boolean bRedoAllRecommendations = false;
+	private boolean bReIndexAll = false;
 	
 	private void loadOptions()
 	{
@@ -1186,6 +1147,14 @@ public class Recommender extends DBThread
 	        if (sValue != null) sSMTPServer = sValue;
 	        sValue = properties.getProperty("admin_email");
 	        if (sValue != null) sAdminEmail = sValue;
+	        sValue = properties.getProperty("test_mode");
+	        if (sValue != null) bTest = "true".equals(sValue);
+	        sValue = properties.getProperty("no_harvest");
+	        if (sValue != null) bNoHarvest = "true".equals(sValue);
+	        sValue = properties.getProperty("redo_recommendations");
+	        if (sValue != null) bRedoAllRecommendations = "true".equals(sValue);
+	        sValue = properties.getProperty("reindex_all");
+	        if (sValue != null) bReIndexAll = "true".equals(sValue);
 	    }
 	    catch(Exception e){Logger.error(e);}
 	    
@@ -1292,54 +1261,6 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	// TODO: Move to the harvester
-	private void updateLanguageRecordCounts() 
-	{
-		try
-		{
-			Statement st = cnRecommender.createStatement();
-			st.executeUpdate("UPDATE feeds SET entries_count = (SELECT count(*) FROM entries WHERE feed_id = feeds.id)");
-			st.executeUpdate("UPDATE languages SET indexed_records = (SELECT count(*) FROM entries WHERE entries.language_id = languages.id)");
-			st.close();
-		}
-		catch (SQLException e)
-		{
-			Logger.error("updateLanguagesRecordCount", e);
-		}
-	}
-	
-//	private void testLucene() throws Exception
-//	{
-//		createIndexWriters();
-//
-//		EntryInfo entry = new EntryInfo();
-//		entry.nEntryID = 1;
-//		entry.nFeedID = 1;
-//		entry.sLanguage = "en";
-//		entry.sURI = "http://localhost/";
-//		entry.sTitle = "Title";
-//		entry.sFeedShortTitle = "MIT";
-//		entry.sDescription = "Alvirne's AP Calculus Class invites you to join them in their preparation for the AP exam. In addition to their own <a href=\"http://www.seresc.k12.nh.us/www/currpb.html\">Problem of the Week</a> and a <a href=\"http://www.seresc.k12.nh.us/www/guestpb.html\">Guest Problem of the Week,</a> these students maintain links to teacher and student calculus resources on the Internet; post information about the AP Calculus exam; and maintain archives of previous Alvirne and guest problems dating back to 1995, with detailed solutions.";
-//		entry.sTagList = "Tag";
-//		indexEntry(entry);
-//		
-////		entry.nEntryID = 2;
-////		indexEntry(entry);
-////		
-////		entry.nEntryID = 3;
-////		entry.sTitle = "Testing Lucene is Not as Fun as You Might Think!";
-////		indexEntry(entry);
-//		
-//		closeIndexWriters();
-//		
-//		createIndexReaders();
-//		createIndexSearchers();
-//		entry.nEntryID = 1;
-//		getRelatedEntries(entry);
-//		closeIndexSearchers();
-//		closeIndexReaders();
-//	}
-	
 	private void updateForDeletedEntries(boolean bRedoAllRecommendations) throws Exception
 	{
 		Vector<EntryInfo> vEntries = getDeletedEntries();
@@ -1393,7 +1314,7 @@ public class Recommender extends DBThread
 				{
 					EntryInfo entry = new EntryInfo();
 					entry.nEntryID = nEntryID;  
-					entry.nLanguageID = htLanguagesToID.get(sLanguage); 
+					entry.nLanguageID = htLanguageToID.get(sLanguage); 
 					vEntries.add(entry);
 				}
 			}
@@ -1420,57 +1341,6 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	private void processDocuments(boolean bNoHarvest, boolean bRedoAllRecommendations, boolean bReIndexAll)
-	{
-		loadOptions();
-
-		Logger.status("processDocuments - begin");
-		
-		// use the aggregator to get any new records
-		boolean bChanges = true;
-		if (!bNoHarvest) bChanges = Harvester.harvest();
-//		boolean bChanges=true;
-		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
-		
-		try
-		{
-			cnRecommender = getConnection("recommender");
-			
-			// get supported languages
-			getLanguageMappings(cnRecommender);
-			
-			createAnalyzers();
-/*			
-			// update indexes and db for deleted records (OAI)
-			updateForDeletedEntries(bRedoAllRecommendations);
-				
-			// index any new records
-			updateIndex(bReIndexAll);
-			
-			// create recommendations just for the new records, or for all
-			updateRecommendations(bRedoAllRecommendations);
-			
-			// create recommendations for new users or update recommendations for old ones
-			updatePersonalRecommendations(bRedoAllRecommendations);
-			
-			// update tag lists
-			if (bChanges) */updateTags();
-			if (bChanges) updateQueries();
-			
-			// close the lucene indexes
-			closeCores();
-			
-//			if (bChanges) updateLanguageRecordCounts();
-			
-			cnRecommender.close();
-		}
-		catch(Exception e){Logger.error(e);}
-
-		Logger.status("processDocuments - end");
-
-		if (sSMTPServer != null) notifyAdminOfResults();
-	}
-	
 	final static String sEmailFrom = "oerrecomender@cosl.usu.edu";
 	final static String sReportSubject = "OER Recommender Harvest Report";
 	public void notifyAdminOfResults()
@@ -1481,12 +1351,13 @@ public class Recommender extends DBThread
 	public void getLanguageMappings(Connection cn)
     {
     	try{
-    	PreparedStatement pstGetSupportLanguages=cn.prepareStatement("SELECT id, locale, is_default FROM languages where muck_raker_supported=1");
-    	ResultSet result=pstGetSupportLanguages.executeQuery();
+	    	PreparedStatement pstGetSupportLanguages=cn.prepareStatement("SELECT id, locale, is_default FROM languages where muck_raker_supported=1");
+	    	ResultSet result=pstGetSupportLanguages.executeQuery();
 	    	while(result.next()){
 	    		Integer nLanguageID = result.getInt(1);
-	    		htIDToLanguages.put(nLanguageID,result.getString(2).substring(0,2));
-	    		htLanguagesToID.put(result.getString(2).substring(0,2),nLanguageID);
+	    		String sLocale = result.getString(2).substring(0,2);
+	    		htIDToLanguage.put(nLanguageID,sLocale);
+	    		htLanguageToID.put(sLocale,nLanguageID);
 	    	}
     	}
     	catch(Exception e){
@@ -1494,14 +1365,83 @@ public class Recommender extends DBThread
     	}
     }
 	
+	private void generateTagClouds()
+	{
+		loadOptions();
+
+		Logger.status("generateTagClouds - begin");
+		
+		try
+		{
+			cnRecommender = getConnection("recommender");
+			getLanguageMappings(cnRecommender);
+			createAnalyzers();
+			updateTagLists();
+			closeCores();
+			cnRecommender.close();
+		}
+		catch(Exception e)
+		{
+			Logger.error(e);
+		}
+	}
+	
+	private void processDocuments()
+	{
+		loadOptions();
+
+		Logger.status("processDocuments - begin");
+		
+		// use the aggregator to get any new records
+		boolean bChanges = true;
+		if (!bNoHarvest) bChanges = Harvester.harvest(bTest);
+		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
+		
+		try
+		{
+			cnRecommender = getConnection("recommender");
+			
+			// get supported languages
+			getLanguageMappings(cnRecommender);
+			
+			createAnalyzers();
+			
+			// update indexes and db for deleted records (OAI)
+			updateForDeletedEntries(bRedoAllRecommendations);
+				
+			// index any new records
+			updateIndex(bReIndexAll);
+			
+			// update tag clouds
+			updateTagClouds();
+//			if (bChanges) updateQueries();
+			
+			// create recommendations just for the new records, or for all
+			updateRecommendations(bRedoAllRecommendations);
+			
+			// create recommendations for new users or update recommendations for old ones
+			updatePersonalRecommendations(bRedoAllRecommendations);
+			
+			// close the lucene indexes
+			closeCores();
+			
+			cnRecommender.close();
+		}
+		catch(Exception e){Logger.error(e);}
+
+		Logger.status("processDocuments - end");
+
+		if (sSMTPServer != null) notifyAdminOfResults();
+	}
+	
 	public static void update(String sAction)
 	{
-		new Recommender().processDocuments("noharvest".equals(sAction), "full".equals(sAction), "reindex".equals(sAction));
+		new Recommender().processDocuments();
 	}
 	
 	public static void main(String[] args) 
 	{
+//		new Recommender().generateTagClouds();
 		update(args.length > 0 ? args[0] : "");
-		System.exit(0) ;
 	}
 }

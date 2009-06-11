@@ -26,7 +26,6 @@ public class EntryInfo implements Comparable<EntryInfo>
 	String sURI;
 	String sDirectLink;
 	String sDescription;
-	String sTagList;
 	double dRelevance;
 	int nClicks;
 	long lAvgTimeAtDest = 60;
@@ -42,7 +41,6 @@ public class EntryInfo implements Comparable<EntryInfo>
 		sDirectLink = rsEntries.getString("direct_link");
 		sTitle = rsEntries.getString("title");
 		sDescription = rsEntries.getString("description");
-		sTagList = rsEntries.getString("tag_list");
 		nLanguageID = rsEntries.getInt("language_id");
 	}
 	public int compareTo(EntryInfo e){return this.lAvgTimeAtDest > e.lAvgTimeAtDest ? 1 : this.lAvgTimeAtDest == e.lAvgTimeAtDest ? 0 : -1;}

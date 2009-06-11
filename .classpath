@@ -10,7 +10,6 @@
 	<classpathentry kind="lib" path="lib/flickrapi-1.0a9.jar"/>
 	<classpathentry kind="lib" path="lib/jdom.jar"/>
 	<classpathentry kind="lib" path="lib/jericho.jar"/>
-	<classpathentry kind="lib" path="lib/rome-0.9.jar"/>
 	<classpathentry kind="lib" path="lib"/>
 	<classpathentry kind="lib" path="lib/axis.jar"/>
 	<classpathentry kind="lib" path="lib/commons-discovery-0.2.jar"/>
@@ -38,6 +37,7 @@
 	<classpathentry kind="lib" path="lib/lucene-spellchecker-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
 	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
+	<classpathentry kind="lib" path="lib/rome-1.0.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregatord"/>
 	<classpathentry kind="output" path="bin"/>

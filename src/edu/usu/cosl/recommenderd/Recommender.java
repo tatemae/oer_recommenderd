@@ -1123,7 +1123,7 @@ public class Recommender extends DBThread
 	}
 	
 	private boolean bTest = false;
-	private boolean bNoHarvest = false;
+	private boolean bHarvest = true;
 	private boolean bRedoAllRecommendations = false;
 	private boolean bReIndexAll = false;
 	
@@ -1149,12 +1149,14 @@ public class Recommender extends DBThread
 	        if (sValue != null) sAdminEmail = sValue;
 	        sValue = properties.getProperty("test_mode");
 	        if (sValue != null) bTest = "true".equals(sValue);
-	        sValue = properties.getProperty("no_harvest");
-	        if (sValue != null) bNoHarvest = "true".equals(sValue);
+	        sValue = properties.getProperty("harvest");
+	        if (sValue != null) bHarvest = "true".equals(sValue);
 	        sValue = properties.getProperty("redo_recommendations");
 	        if (sValue != null) bRedoAllRecommendations = "true".equals(sValue);
 	        sValue = properties.getProperty("reindex_all");
 	        if (sValue != null) bReIndexAll = "true".equals(sValue);
+	        
+	        getDBOptions(properties);
 	    }
 	    catch(Exception e){Logger.error(e);}
 	    
@@ -1373,7 +1375,7 @@ public class Recommender extends DBThread
 		
 		try
 		{
-			cnRecommender = getConnection("recommender");
+			cnRecommender = getConnection();
 			getLanguageMappings(cnRecommender);
 			createAnalyzers();
 			updateTagLists();
@@ -1388,18 +1390,16 @@ public class Recommender extends DBThread
 	
 	private void processDocuments()
 	{
-		loadOptions();
-
 		Logger.status("processDocuments - begin");
 		
 		// use the aggregator to get any new records
 		boolean bChanges = true;
-		if (!bNoHarvest) bChanges = Harvester.harvest(bTest);
+		if (bHarvest) bChanges = Harvester.harvest(bTest);
 		if (!bReIndexAll && !bChanges && !bRedoAllRecommendations) return;
 		
 		try
 		{
-			cnRecommender = getConnection("recommender");
+			cnRecommender = getConnection();
 			
 			// get supported languages
 			getLanguageMappings(cnRecommender);
@@ -1436,7 +1436,10 @@ public class Recommender extends DBThread
 	
 	public static void update(String sAction)
 	{
-		new Recommender().processDocuments();
+		Recommender r = new Recommender();
+		r.loadOptions();
+		if (sAction.equals("skip_harvest")) r.bHarvest = false;
+		r.processDocuments();
 	}
 	
 	public static void main(String[] args) 

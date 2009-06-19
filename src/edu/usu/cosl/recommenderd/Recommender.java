@@ -830,7 +830,8 @@ public class Recommender extends DBThread
 		{
 			int nLanguageID = eLanguageIDs.nextElement();
 			Logger.info("Generating tag cloud for language: " + htIDToLanguage.get(nLanguageID));
-			String sTagList = getTagListForLanguage(nLanguageID, 100);
+			final int TOP_LEVEL_TAG_COUNT = 200;
+			String sTagList = getTagListForLanguage(nLanguageID, TOP_LEVEL_TAG_COUNT);
 			if (sTagList.length() > 0) {
 				pstAddTagList.setInt(1, nLanguageID);
 				pstAddTagList.setString(2, "all");

@@ -72,8 +72,6 @@ public class Recommender extends DBThread
 	private int nMaxRecommendations = 20;
 	private String sSMTPServer = null;
 	private String sAdminEmail = null;
-	private Hashtable<Integer, String> htIDToLanguage = new Hashtable<Integer, String>();
-	private Hashtable<String, Integer> htLanguageToID = new Hashtable<String, Integer>();
 
 	static private String quoteEncode(String sText)
 	{
@@ -359,24 +357,26 @@ public class Recommender extends DBThread
 		Vector<EntryInfo> vEntries = new Vector<EntryInfo>();
 		try
 		{
+			String sCode = Locales.getCode(entry.nLanguageID);
+			
 			// if we don't have an anlyzer for the language, bail
-			Analyzer analyzer = htAnalyzers.get(htIDToLanguage.get(entry.nLanguageID));
+			Analyzer analyzer = htAnalyzers.get(sCode);
 		    if (analyzer == null) return vEntries;
 		    
 		    // find the lucene document for the entry
 			TermQuery query = new TermQuery(new Term("id","Entry:" + entry.nEntryID));
-			IndexSearcher searcher = htSearchers.get(htIDToLanguage.get(entry.nLanguageID));
+			IndexSearcher searcher = htSearchers.get(sCode);
 		    Hits hits = searcher.search(query);
 		    int nDocID = hits.id(0);
 		    if (hits.length() == 0 || nDocID == 0) return vEntries;
 		    
 		    // ask lucene for more entries like this on
-		    IndexReader reader = htReaders.get(htIDToLanguage.get(entry.nLanguageID));
+		    IndexReader reader = htReaders.get(sCode);
 		    MoreLikeThis mlt = new MoreLikeThis(reader);
 		    mlt.setMinTermFreq(1);
 		    mlt.setAnalyzer(analyzer);
 		    mlt.setFieldNames(new String[]{"text"});
-		    mlt.setMinWordLen(("zh".equals(htIDToLanguage.get(entry.nLanguageID)) || "ja".equals(htIDToLanguage.get(entry.nLanguageID))) ? 1 : 4);
+		    mlt.setMinWordLen(("zh".equals(sCode) || "ja".equals(sCode)) ? 1 : 4);
 		    mlt.setMinDocFreq(2);
 		    mlt.setBoost(true);
 		    Query like = mlt.like(nDocID);
@@ -714,7 +714,7 @@ public class Recommender extends DBThread
 			IndexSearcher searcher = new IndexSearcher(reader);
 			
 			// ask the db for the entries that have been updated or added for the language
-			Vector<Integer> vIDs = getIDsOfEntries("WHERE indexed_at > relevance_calculated_at AND language_id = " + htLanguageToID.get(sLanguageCode));
+			Vector<Integer> vIDs = getIDsOfEntries("WHERE indexed_at > relevance_calculated_at AND language_id = " + Locales.getID(sLanguageCode));
 			Logger.info("Generating subjects for entries (" + sLanguageCode + "): " + vIDs.size());
 			for(Enumeration<Integer> eID = vIDs.elements(); eID.hasMoreElements();)
 			{
@@ -754,21 +754,6 @@ public class Recommender extends DBThread
 		Logger.status("autoGenerateSubjectsForEntries - end");
 	}
 	
-	private void updateTagClouds() throws Exception
-	{
-		Logger.status("Update tag clouds - begin");
-		try
-		{
-			autoGenerateSubjectsForEntries();
-			
-			TagCloud.updateClouds(cnRecommender, htIDToLanguage);
-		}
-		catch (Exception e) {
-			Logger.error("updateTagClouds-error: ", e);
-		}
-		Logger.status("Update tag clouds - end");
-	}
-
 	private void updateQueries()
 	{
 		Logger.info("updateQueries - begin");
@@ -829,10 +814,10 @@ public class Recommender extends DBThread
 	private void indexEntry(EntryInfo entry) throws Exception 
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		Analyzer analyzer = htAnalyzers.get(htIDToLanguage.get(entry.nLanguageID));
+		Analyzer analyzer = htAnalyzers.get(Locales.getCode(entry.nLanguageID));
 		if (analyzer != null)
 		{
-			htWriters.get(htIDToLanguage.get(entry.nLanguageID)).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
+			htWriters.get(Locales.getCode(entry.nLanguageID)).updateDocument(new Term("id","Entry:" + entry.nEntryID), LuceneDocument.Document(entry), analyzer);
 		}
 		pstFlagEntryIndexed.setInt(1, entry.nEntryID);
 		pstFlagEntryIndexed.addBatch();
@@ -856,7 +841,7 @@ public class Recommender extends DBThread
 	private void removeEntryFromIndex(EntryInfo entry) throws Exception
 	{
 		// don't put into lucene entries whose language we don't have an analyzer for
-		htWriters.get(htIDToLanguage.get(entry.nLanguageID)).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
+		htWriters.get(Locales.getCode(entry.nLanguageID)).deleteDocuments(new Term("id","Entry:" + entry.nEntryID));
 	}
 	
 	private void getIDsOfEntriesPointingAtEntry(Vector<Integer> vIDs, int nEntryID) throws SQLException
@@ -1037,13 +1022,9 @@ public class Recommender extends DBThread
 	
 	private void loadOptions()
 	{
-		Properties properties = new Properties();
 	    try 
 	    {
-	    	// load the property file
-	    	FileInputStream in = new FileInputStream("recommenderd.properties");
-	        properties.load(in);
-	        in.close();
+	    	Properties properties = loadPropertyFile("recommenderd.properties");
 	        
 			// get some options out of it
 	        String sValue = properties.getProperty("max_recommendations");
@@ -1064,7 +1045,7 @@ public class Recommender extends DBThread
 	        sValue = properties.getProperty("reindex_all");
 	        if (sValue != null) bReIndexAll = "true".equals(sValue);
 	        
-	        getDBOptions(properties);
+	        getLoggerAndDBOptions(properties);
 	    }
 	    catch(Exception e){Logger.error(e);}
 	    
@@ -1224,7 +1205,7 @@ public class Recommender extends DBThread
 				{
 					EntryInfo entry = new EntryInfo();
 					entry.nEntryID = nEntryID;  
-					entry.nLanguageID = htLanguageToID.get(sLanguage); 
+					entry.nLanguageID = Locales.getID(sLanguage); 
 					vEntries.add(entry);
 				}
 			}
@@ -1257,43 +1238,6 @@ public class Recommender extends DBThread
 	{
 		SendMail.sendMsg(sSMTPServer, sEmailFrom, sAdminEmail, sReportSubject, Logger.getMessages());
 	}
-	public void getLanguageMappings(Connection cn)
-    {
-    	try{
-	    	PreparedStatement pstGetSupportLanguages=cn.prepareStatement("SELECT id, locale, is_default FROM languages where muck_raker_supported=1");
-	    	ResultSet result=pstGetSupportLanguages.executeQuery();
-	    	while(result.next()){
-	    		Integer nLanguageID = result.getInt(1);
-	    		String sLocale = result.getString(2).substring(0,2);
-	    		htIDToLanguage.put(nLanguageID,sLocale);
-	    		htLanguageToID.put(sLocale,nLanguageID);
-	    	}
-    	}
-    	catch(Exception e){
-    		Logger.error("Read from table language");
-    	}
-    }
-	
-//	private void generateTagClouds()
-//	{
-//		loadOptions();
-//
-//		Logger.status("generateTagClouds - begin");
-//		
-//		try
-//		{
-//			cnRecommender = getConnection();
-//			getLanguageMappings(cnRecommender);
-//			createAnalyzers();
-//			updateTagClouds();
-//			closeCores();
-//			cnRecommender.close();
-//		}
-//		catch(Exception e)
-//		{
-//			Logger.error(e);
-//		}
-//	}
 	
 	private void processDocuments()
 	{
@@ -1308,9 +1252,6 @@ public class Recommender extends DBThread
 		{
 			cnRecommender = getConnection();
 			
-			// get supported languages
-			getLanguageMappings(cnRecommender);
-			
 			createAnalyzers();
 			
 			// update indexes and db for deleted records (OAI)
@@ -1319,8 +1260,11 @@ public class Recommender extends DBThread
 			// index any new records
 			updateIndex(bReIndexAll);
 			
+			// for subjects that have fewer than 5 subjects (tags), we autogenerate some more
+			autoGenerateSubjectsForEntries();
+			
 			// update tag clouds
-			updateTagClouds();
+			TagCloud.updateClouds();
 //			if (bChanges) updateQueries();
 			
 			// create recommendations just for the new records, or for all

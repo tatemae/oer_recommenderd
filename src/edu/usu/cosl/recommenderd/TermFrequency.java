@@ -1,6 +1,6 @@
 package edu.usu.cosl.recommenderd;
 
-public class TermFrequency implements Comparable 
+public class TermFrequency implements Comparable<TermFrequency> 
 {
 	String sTerm;
 	int nFrequency;
@@ -14,18 +14,18 @@ public class TermFrequency implements Comparable
 		this.nFrequency = nFrequency;
 		this.bSortOnName = bSortOnName;
 	}
-	private int compareNames(Object o) {
-		return sTerm.compareTo(((TermFrequency)o).sTerm);
+	private int compareNames(TermFrequency tf) {
+		return sTerm.compareTo(tf.sTerm);
 	}
-	public int compareFrequencies(Object o) {
-		int nOtherFreq = ((TermFrequency)o).nFrequency;
+	public int compareFrequencies(TermFrequency tf) {
+		int nOtherFreq = tf.nFrequency;
 		if (nOtherFreq == nFrequency) return 0;
 		else if (nOtherFreq < nFrequency) return -1;
 		else return 1;
 	}
-	public int compareTo(Object o) {
-		if (bSortOnName) return compareNames(o);
-		else return compareFrequencies(o);
+	public int compareTo(TermFrequency tf) {
+		if (bSortOnName) return compareNames(tf);
+		else return compareFrequencies(tf);
 	}
 }
 

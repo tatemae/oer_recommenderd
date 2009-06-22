@@ -580,35 +580,6 @@ public class Recommender extends DBThread
 		}
 	}
 	
-	class TermFrequency implements Comparable 
-	{
-		String sTerm;
-		int nFrequency;
-		boolean bSortOnName;
-		
-		public TermFrequency(String sTerm, int nFrequency) {
-			this(sTerm,nFrequency,false);
-		}
-		public TermFrequency(String sTerm, int nFrequency, boolean bSortOnName) {
-			this.sTerm = sTerm;
-			this.nFrequency = nFrequency;
-			this.bSortOnName = bSortOnName;
-		}
-		private int compareNames(Object o) {
-			return sTerm.compareTo(((TermFrequency)o).sTerm);
-		}
-		public int compareFrequencies(Object o) {
-			int nOtherFreq = ((TermFrequency)o).nFrequency;
-			if (nOtherFreq == nFrequency) return 0;
-			else if (nOtherFreq < nFrequency) return -1;
-			else return 1;
-		}
-		public int compareTo(Object o) {
-			if (bSortOnName) return compareNames(o);
-			else return compareFrequencies(o);
-		}
-	}
-	
 	private void autoGenerateSubjects(HashSet hsSubjects, int nEntryID, int nSubjects, IndexReader reader, IndexSearcher searcher)
 	{
 		try {
@@ -783,75 +754,14 @@ public class Recommender extends DBThread
 		Logger.status("autoGenerateSubjectsForEntries - end");
 	}
 	
-	PreparedStatement pstGetTagList;
-	
-	private String getTagListForLanguage(int nLanguageID, int nMaxTags) throws Exception
-	{
-		StringBuffer sbList = new StringBuffer(2500);
-		
-		// get the top tags and their frequencies
-		int nTags = 0;
-		TermFrequency[] atf = new TermFrequency[nMaxTags];
-		pstGetTagList.setInt(1,nLanguageID);
-		pstGetTagList.setInt(2,nMaxTags);
-		ResultSet rsTags = pstGetTagList.executeQuery();
-		double dMin = 100000;
-		double dMax = 0;
-		while (rsTags.next()) {
-			int nFreq = rsTags.getInt(2);
-			if (nFreq < dMin) dMin = nFreq;
-			if (nFreq > dMax) dMax = nFreq;
-			atf[nTags] = new TermFrequency(rsTags.getString(1), nFreq, true);
-			nTags++;
-		}
-		// sort the tags by frequency
-		Arrays.sort(atf, 0, nTags);
-		
-		// scale their frequencies and generate a list
-		double dTagRange = dMax - dMin;
-		final double dStyleRange = 5;
-		for (int nTag = 0; nTag < nTags; nTag++) {
-			TermFrequency tf = atf[nTag];
-			if (nTag > 0) sbList.append(",");
-			sbList.append(tf.sTerm);
-			sbList.append(",");
-			sbList.append(Math.round( ((double)tf.nFrequency - dMin)*dStyleRange/dTagRange ));
-		}
-		return sbList.toString();
-	}
-	
-	private void updateTagLists() throws Exception
-	{
-		pstGetTagList = cnRecommender.prepareStatement("SELECT s.name, count(*) AS count FROM entries_subjects AS es INNER JOIN subjects AS s ON es.subject_id = s.id INNER JOIN entries AS e ON es.entry_id = e.id WHERE e.language_id = ? GROUP BY es.subject_id ORDER BY count DESC LIMIT ?;");
-		PreparedStatement pstAddTagList = cnRecommender.prepareStatement("REPLACE INTO cloud_caches SET language_id = ?, filter = ?, tag_list = ?");
-
-		// loop through each of the languages
-		for (Enumeration<Integer>eLanguageIDs = htIDToLanguage.keys(); eLanguageIDs.hasMoreElements();)
-		{
-			int nLanguageID = eLanguageIDs.nextElement();
-			Logger.info("Generating tag cloud for language: " + htIDToLanguage.get(nLanguageID));
-			final int TOP_LEVEL_TAG_COUNT = 200;
-			String sTagList = getTagListForLanguage(nLanguageID, TOP_LEVEL_TAG_COUNT);
-			if (sTagList.length() > 0) {
-				pstAddTagList.setInt(1, nLanguageID);
-				pstAddTagList.setString(2, "all");
-				pstAddTagList.setString(3, sTagList);
-				pstAddTagList.addBatch();
-			}
-		}
-		pstAddTagList.executeBatch();
-		pstAddTagList.close();
-		pstGetTagList.close();
-	}
-	
-	private void updateTagClouds()
+	private void updateTagClouds() throws Exception
 	{
 		Logger.status("Update tag clouds - begin");
 		try
 		{
 			autoGenerateSubjectsForEntries();
 			
-			updateTagLists();
+			TagCloud.updateClouds(cnRecommender, htIDToLanguage);
 		}
 		catch (Exception e) {
 			Logger.error("updateTagClouds-error: ", e);
@@ -1364,26 +1274,26 @@ public class Recommender extends DBThread
     	}
     }
 	
-	private void generateTagClouds()
-	{
-		loadOptions();
-
-		Logger.status("generateTagClouds - begin");
-		
-		try
-		{
-			cnRecommender = getConnection();
-			getLanguageMappings(cnRecommender);
-			createAnalyzers();
-			updateTagLists();
-			closeCores();
-			cnRecommender.close();
-		}
-		catch(Exception e)
-		{
-			Logger.error(e);
-		}
-	}
+//	private void generateTagClouds()
+//	{
+//		loadOptions();
+//
+//		Logger.status("generateTagClouds - begin");
+//		
+//		try
+//		{
+//			cnRecommender = getConnection();
+//			getLanguageMappings(cnRecommender);
+//			createAnalyzers();
+//			updateTagClouds();
+//			closeCores();
+//			cnRecommender.close();
+//		}
+//		catch(Exception e)
+//		{
+//			Logger.error(e);
+//		}
+//	}
 	
 	private void processDocuments()
 	{

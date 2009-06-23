@@ -1,10 +1,10 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.tagclouds;
 
 public class TermFrequency implements Comparable<TermFrequency> 
 {
-	String sTerm;
-	int nFrequency;
-	boolean bSortOnName;
+	public String sTerm;
+	public int nFrequency;
+	public boolean bSortOnName;
 	
 	public TermFrequency(String sTerm, int nFrequency) {
 		this(sTerm,nFrequency,false);

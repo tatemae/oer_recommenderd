@@ -1,6 +1,5 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.tagclouds;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -8,16 +7,17 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Enumeration;
 
+import edu.usu.cosl.recommenderd.Base;
+import edu.usu.cosl.util.Locales;
 import edu.usu.cosl.util.Logger;
-import edu.usu.cosl.util.DBThread;
 
-class TagCloud extends DBThread
+public class TagCloud extends Base
 {
-	static Connection cn;
-	static PreparedStatement pstAddTagCloud;
-	static PreparedStatement pstGetTagCloud;
-	static PreparedStatement pstGetFilteredTagCloud;
-	static int nUpdatedClouds = 0;
+	int nUpdatedClouds = 0;
+
+	PreparedStatement pstAddTagCloud;
+	PreparedStatement pstGetTagCloud;
+	PreparedStatement pstGetFilteredTagCloud;
 	
 	int nTags;
 	double dMin;
@@ -39,7 +39,7 @@ class TagCloud extends DBThread
 		this.sFilter = sFilter;
 	}
 
-	private static void setupPreparedStatements() throws Exception
+	private void setupPreparedStatements() throws Exception
 	{
 		if (cn == null && pstGetFilteredTagCloud == null)
 		{
@@ -49,7 +49,7 @@ class TagCloud extends DBThread
 			pstAddTagCloud = cn.prepareStatement("REPLACE INTO tag_clouds SET language_id = ?, filter = ?, tag_list = ?");
 		}
 	}
-	private static void closePreparedStatements() throws SQLException
+	private void closePreparedStatements() throws SQLException
 	{
 		if (nUpdatedClouds > 0) pstAddTagCloud.executeBatch();
 		pstAddTagCloud.close();
@@ -108,7 +108,7 @@ class TagCloud extends DBThread
 			pstAddTagCloud.setString(3, sTagCloud);
 			pstAddTagCloud.addBatch();
 		}
-		if (nUpdatedClouds % 100) {
+		if (nUpdatedClouds%100 == 100) {
 			pstAddTagCloud.executeBatch();
 			nUpdatedClouds = 0;
 		}
@@ -179,8 +179,9 @@ class TagCloud extends DBThread
         return ps;
 	}
 	
-	private TagCloud updateCloud() throws SQLException
+	private TagCloud updateCloud() throws Exception
 	{
+		setupPreparedStatements();
 		if (sFilter == null) 
 		{
 			// get the top tags and their frequencies
@@ -201,6 +202,7 @@ class TagCloud extends DBThread
 			getTagCloud(getMultiTagStatement());
 		}
 		storeTagCloud(getTagCloudString());
+		closePreparedStatements();
 		return this;
 	}
 	
@@ -210,7 +212,7 @@ class TagCloud extends DBThread
 		else return sTag2 + "/" + sTag1;
 	}
 	
-	private static void updateLanguageClouds(int nLanguageID) throws SQLException
+	private static void updateLanguageClouds(int nLanguageID) throws Exception
 	{
 		final int TOP_LEVEL_TAG_COUNT = 200;
 		TagCloud tc1 = new TagCloud(nLanguageID, TOP_LEVEL_TAG_COUNT).updateCloud();
@@ -227,24 +229,22 @@ class TagCloud extends DBThread
 		}
 	}
 	
-	public static void updateClouds() throws Exception
+	public static void update() throws Exception
 	{
 		Logger.status("Updating tag clouds - begin");
-		setupPreparedStatements();
 		for (Enumeration<Integer>eLanguageIDs = Locales.getLocaleIDs(); eLanguageIDs.hasMoreElements();)
 		{
 			int nLanguageID = eLanguageIDs.nextElement();
 			Logger.info("Generating tag cloud for language: " + Locales.getCode(nLanguageID));
 			TagCloud.updateLanguageClouds(nLanguageID);
 		}
-		closePreparedStatements();
 		Logger.status("Updating tag clouds - end");
 	}
 	public static void main(String[] args) 
 	{
 		try {
 			getLoggerAndDBOptions("recommenderd.properties");
-			updateClouds();
+			update();
 		} catch (Exception e) {
 			Logger.error(e);
 		}

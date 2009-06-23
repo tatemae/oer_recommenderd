@@ -1,7 +1,9 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.indexer;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+
+import edu.usu.cosl.recommenderd.EntryInfo;
 
 public class LuceneDocument {
   public static Document Document(EntryInfo entry)

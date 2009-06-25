@@ -171,7 +171,7 @@ public class Indexer extends Base
 		
 				PreparedStatement pstEntryToIndex = cn.prepareStatement(
 						"SELECT entries.id, entries.feed_id, permalink, direct_link, entries.title, entries.description, " + 
-						"entries.language_id, feeds.short_title AS collection " + 
+						"entries.language_id, feeds.short_title AS collection, entries.grain_size " + 
 						"FROM entries " +
 						"INNER JOIN feeds ON entries.feed_id = feeds.id " +
 						"WHERE entries.id = ?");
@@ -351,7 +351,7 @@ public class Indexer extends Base
 	{
 		try {
 			getLoggerAndDBOptions("recommenderd.properties");
-			update(false);
+			update(true);
 		} catch (Exception e) {
 			Logger.error(e);
 		}

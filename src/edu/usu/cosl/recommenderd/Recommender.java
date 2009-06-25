@@ -64,7 +64,7 @@ public class Recommender extends Base
 					"UPDATE entries SET relevance_calculated_at = now() WHERE id = ?");
 		
 				PreparedStatement pstEntryToCreateRecommendationsFor = cn.prepareStatement(
-					"SELECT id, feed_id, permalink, direct_link, title, description, language_id " +
+					"SELECT id, feed_id, permalink, direct_link, title, description, language_id, grain_size " +
 					"FROM entries WHERE id = ?");
 				
 				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)

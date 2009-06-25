@@ -32,6 +32,8 @@ public class EntryInfo implements Comparable<EntryInfo>
 	
 	public long lLastModified;
 	
+	public String sGrainSize; 
+	
 	public EntryInfo(){}
 	public EntryInfo(ResultSet rsEntries) throws Exception
 	{
@@ -42,6 +44,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 		sTitle = rsEntries.getString("title");
 		sDescription = rsEntries.getString("description");
 		nLanguageID = rsEntries.getInt("language_id");
+		sGrainSize = rsEntries.getString("grain_size");
 	}
 	public int compareTo(EntryInfo e){return this.lAvgTimeAtDest > e.lAvgTimeAtDest ? 1 : this.lAvgTimeAtDest == e.lAvgTimeAtDest ? 0 : -1;}
 }

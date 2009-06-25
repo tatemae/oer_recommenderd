@@ -64,5 +64,6 @@ public class Recommenderd extends Base
 	public static void main(String[] args) 
 	{
 		update("recommenderd.properties", args.length > 0 ? args[0] : "");
+		System.exit(0);
 	}
 }

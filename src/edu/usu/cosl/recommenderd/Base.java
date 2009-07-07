@@ -15,6 +15,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.CoreContainer.Initializer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 
@@ -33,6 +34,8 @@ public class Base extends DBThread
 	protected Hashtable<String, IndexSearcher> htSearchers;
 
 	protected int nMaxRecommendations = 20;
+	protected int nTagCloudDepth = 3;
+	static protected String sSolrConfigFilename;
 
 	private void configSolrLogging()
 	{
@@ -54,7 +57,6 @@ public class Base extends DBThread
         java.util.logging.Logger.getLogger(org.apache.solr.update.UpdateHandler.class.getName()).setLevel(level);
 	}
 	
-	protected boolean bTest = false;
 	protected boolean bHarvest = true;
 	protected boolean bRedoAllRecommendations = false;
 	protected boolean bReIndexAll = false;
@@ -75,14 +77,16 @@ public class Base extends DBThread
 	        }
 	        sValue = properties.getProperty("admin_email");
 	        if (sValue != null) sAdminEmail = sValue;
-	        sValue = properties.getProperty("test_mode");
-	        if (sValue != null) bTest = "true".equals(sValue);
 	        sValue = properties.getProperty("harvest");
 	        if (sValue != null) bHarvest = "true".equals(sValue);
 	        sValue = properties.getProperty("redo_recommendations");
 	        if (sValue != null) bRedoAllRecommendations = "true".equals(sValue);
 	        sValue = properties.getProperty("reindex_all");
 	        if (sValue != null) bReIndexAll = "true".equals(sValue);
+	        sValue = properties.getProperty("solr_config_filename");
+	        if (sValue != null && System.getProperty("solr.solr.home") == null) sSolrConfigFilename = sValue;
+	        sValue = properties.getProperty("tag_cloud_depth");
+	        if (sValue != null) try{nTagCloudDepth = Integer.parseInt(sValue);}catch(Exception nfe){Logger.error("Unable to read tag_cloud_depth option value",nfe);} 
 	        
 	        getLoggerAndDBOptions(properties);
 	    }
@@ -182,7 +186,7 @@ public class Base extends DBThread
 	
 	protected void createAnalyzers() throws Exception
 	{
-		initMultiCore();
+		if (mcore == null) initMultiCore();
 		
 		vCores = new Vector<SolrCore>();
 		htAnalyzers = new Hashtable<String, org.apache.lucene.analysis.Analyzer>();
@@ -195,7 +199,8 @@ public class Base extends DBThread
 	
 	protected void initMultiCore() throws Exception 
 	{
-		org.apache.solr.core.CoreContainer.Initializer initializer = new org.apache.solr.core.CoreContainer.Initializer();
+		Initializer initializer = new Initializer();
+		if (sSolrConfigFilename != null) initializer.setSolrConfigFilename(sSolrConfigFilename);
 		mcore = initializer.initialize();
 	}
 

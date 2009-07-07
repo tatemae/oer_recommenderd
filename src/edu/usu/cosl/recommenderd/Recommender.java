@@ -471,6 +471,7 @@ public class Recommender extends Base
 	
 	private void updateRecommendations(boolean bRedoAllRecommendations) throws Exception
 	{
+		Logger.status("==========================================================Create Recommendations");
 		cn = getConnection();
 		Vector<Integer> vIDs = getIDsOfEntries(bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at");
 		if (vIDs.size() > 0) {
@@ -490,7 +491,7 @@ public class Recommender extends Base
 	{
 		try {
 			getLoggerAndDBOptions("recommenderd.properties");
-			update(false);
+			update(true);
 		} catch (Exception e) {
 			Logger.error(e);
 		}

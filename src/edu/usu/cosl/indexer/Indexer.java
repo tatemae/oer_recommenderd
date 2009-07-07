@@ -331,6 +331,7 @@ public class Indexer extends Base
 	
 	public void updateIndexes(boolean bReIndexAll) throws Exception
 	{
+		Logger.status("==========================================================Index");
 		Logger.status("Updating indexes - begin");
 		setupPreparedStatements(); 
 		createAnalyzers();
@@ -355,5 +356,6 @@ public class Indexer extends Base
 		} catch (Exception e) {
 			Logger.error(e);
 		}
+		Logger.stopLogging();
 	}
 }

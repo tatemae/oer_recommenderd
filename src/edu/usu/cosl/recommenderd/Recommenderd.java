@@ -20,7 +20,7 @@ public class Recommenderd extends Base
 		
 		// use the aggregator to get any new records
 		boolean bChanges = true;
-		if (bHarvest) bChanges = Harvester.harvest(bTest);
+		if (bHarvest) bChanges = Harvester.harvest();
 		
 		try
 		{
@@ -32,11 +32,11 @@ public class Recommenderd extends Base
 				// for subjects that have fewer than 5 subjects (tags), we autogenerate some more
 				SubjectAutoGenerator.update();
 				
-				// update tag clouds
-				if (bChanges) TagCloud.update();
+				// update to level tag clouds
+				TagCloud.update(1);
 				
 				// seed the queries with common subjects
-//				if (bChanges) QueryUpdater.update();
+//				QueryUpdater.update();
 			}
 			if (bChanges || bRedoAllRecommendations) 
 			{
@@ -45,6 +45,12 @@ public class Recommenderd extends Base
 				
 				// create recommendations for new users or update recommendations for old ones
 				PersonalRecommender.update();
+			}
+			if (bChanges) {
+				// update second and third level tag clouds
+				for (int nLevel = 2; nLevel <= nTagCloudDepth && nLevel <= 3; nLevel++) {
+					TagCloud.update(nLevel);
+				}
 			}
 		}
 		catch(Exception e){Logger.error(e);}
@@ -64,6 +70,6 @@ public class Recommenderd extends Base
 	public static void main(String[] args) 
 	{
 		update("recommenderd.properties", args.length > 0 ? args[0] : "");
-		System.exit(0);
+		Logger.stopLogging();
 	}
 }

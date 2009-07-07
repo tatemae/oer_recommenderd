@@ -79,6 +79,7 @@ public class QueryUpdater extends Base {
 		} catch (Exception e) {
 			Logger.error(e);
 		}
+		Logger.stopLogging();
 	}
 
 }

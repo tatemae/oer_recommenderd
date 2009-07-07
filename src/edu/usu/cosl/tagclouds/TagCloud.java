@@ -6,6 +6,7 @@ import java.sql.SQLException;
 
 import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.Vector;
 
 import edu.usu.cosl.recommenderd.Base;
 import edu.usu.cosl.util.Locales;
@@ -19,16 +20,22 @@ public class TagCloud extends Base
 	PreparedStatement pstGetTagCloud;
 
 	int nTags;
-	double dMin;
-	double dMax;
+	int nMin;
+	int nMax;
 	TermFrequency[] atf;
 	int nLanguageID;
 	int nMaxTags;
 	String sFilter;
-	String sGrainSize = "unknown";
 
+	public TagCloud() {
+		atf = new TermFrequency[0];
+	}
 	public TagCloud(int nLanguageID, int nMaxTags) {
 		this(nLanguageID, nMaxTags, null);
+	}
+
+	public TagCloud(int nLanguageID) {
+		this(nLanguageID, 0, null);
 	}
 
 	public TagCloud(int nLanguageID, int nMaxTags, String sFilter) {
@@ -36,19 +43,20 @@ public class TagCloud extends Base
 		this.nMaxTags = nMaxTags;
 		this.atf = new TermFrequency[nMaxTags];
 		this.sFilter = sFilter;
+//		if (sGrainSize != null) this.sGrainSize = sGrainSize; 
 	}
 
 	private void getTagCloud(PreparedStatement pstGetTags) throws SQLException {
 		nTags = 0;
-		dMin = 100000;
-		dMax = 0;
+		nMin = 1000000;
+		nMax = 0;
 		ResultSet rsTags = pstGetTags.executeQuery();
 		while (rsTags.next()) {
 			int nFreq = rsTags.getInt(2);
-			if (nFreq < dMin)
-				dMin = nFreq;
-			if (nFreq > dMax)
-				dMax = nFreq;
+			if (nFreq < nMin)
+				nMin = nFreq;
+			if (nFreq > nMax)
+				nMax = nFreq;
 			String sTag = rsTags.getString(1);
 			if (sFilter == null || !sFilter.contains(sTag)) {
 				atf[nTags] = new TermFrequency(sTag, nFreq, true);
@@ -56,29 +64,29 @@ public class TagCloud extends Base
 			}
 		}
 		rsTags.close();
+		if (nMin == 1000000) nMin = 0;
 
 		// sort the tags by frequency
 		Arrays.sort(atf, 0, nTags);
 	}
 
 	private String getTagCloudString() {
-		StringBuffer sbList = new StringBuffer(2500);
+		StringBuffer sbList = new StringBuffer(5000);
 
 		// scale their frequencies and generate a list
-		double dTagRange = dMax - dMin;
-		final double dStyleRange = 5;
+		sbList.append(nMin + "," + nMax);
 		for (int nTag = 0; nTag < nTags; nTag++) {
 			TermFrequency tf = atf[nTag];
-			if (nTag > 0)
-				sbList.append(",");
+			sbList.append(",");
 			sbList.append(tf.sTerm);
 			sbList.append(",");
-			sbList.append(Math.round(((double) tf.nFrequency - dMin) * dStyleRange / dTagRange));
+//			sbList.append(Math.round(((double) tf.nFrequency - dMin) * dStyleRange / dTagRange));
+			sbList.append(tf.nFrequency);
 		}
 		return sbList.toString();
 	}
 
-	private void storeTagCloud(String sTagCloud) throws SQLException {
+	private void storeTagCloud(String sGrainSize, String sTagCloud) throws SQLException {
 		if (sTagCloud.length() > 0) {
 			pstAddTagCloud.setString(1, sGrainSize);
 			pstAddTagCloud.setInt(2, nLanguageID);
@@ -87,139 +95,79 @@ public class TagCloud extends Base
 //			Logger.info("" + sTagCloud.length() + " - " + sTagCloud);
 			pstAddTagCloud.addBatch();
 		}
-		if (nUpdatedClouds % 100 == 0) {
+		if (nUpdatedClouds % 10 == 0) {
 			pstAddTagCloud.executeBatch();
 			nUpdatedClouds = 0;
 		}
 	}
 
-	private PreparedStatement getMultiTagStatement() throws SQLException {
-		String[] asTags = sFilter.split("/");
+	final static String sTagCloudSQL1 = 
+		"SELECT s.name, count(*) AS count "
+		+ "FROM entries AS e ";
+	final static String sTagCloudSQL2 = 
+		" INNER JOIN entries_subjects AS es ON e.id = es.entry_id "
+		+ "INNER JOIN subjects AS s ON es.subject_id = s.id "
+		+ "WHERE e.language_id = ";
+	final static String sTagCloudSQL3 = 
+		" GROUP BY s.id " +
+		"ORDER BY count DESC " +
+		"LIMIT ? ";
 
-		StringBuffer sb = new StringBuffer(
-				"SELECT subjects.name, COUNT(subjects.id) as count "
-						+ "FROM entries "
-						+ "INNER JOIN entries_subjects ON entries_subjects.entry_id = entries.id "
-						+ "INNER JOIN subjects ON entries_subjects.subject_id = subjects.id "
-						+ "WHERE ");
+	private PreparedStatement getCloudStatement(String sGrainSize) throws Exception
+	{
+		// build the query
+		StringBuffer sbSQL = new StringBuffer(sTagCloudSQL1);
+		String[] asFilterTags = (sFilter == null ? new String[0] : sFilter.split("/"));
+		for (int nTag = 0; nTag < asFilterTags.length; nTag++) {
+			sbSQL.append("INNER JOIN entries_subjects AS es" + nTag + " ON e.id = es" + nTag + ".entry_id ");
+			sbSQL.append("INNER JOIN subjects AS s" + nTag + " ON es" + nTag + ".subject_id = s" + nTag + ".id ");
+		}
+		sbSQL.append(sTagCloudSQL2 + nLanguageID);
 		if ("course".equals(sGrainSize))
-			sb.append("entries.grain_size = 'course' AND ");
-		sb.append("entries.language_id = " + nLanguageID + " AND (");
-
-		if (asTags.length > 0) {
-			sb.append("entries.id IN ");
-			sb.append("(");
-
-			// The following code finds entries that share the same tags
-			sb.append("SELECT et1.entry_id ");
-			sb.append("FROM entries_subjects AS et1 ");
-			sb.append("INNER JOIN subjects t1 ON t1.id = et1.subject_id ");
-
-			for (int nTag = 2; nTag < asTags.length + 2; nTag++) {
-				sb.append("INNER JOIN entries_subjects AS et" + nTag + " ON et"
-						+ nTag + ".entry_id = et1.entry_id ");
-				sb.append("INNER JOIN subjects t" + nTag + " ON t" + nTag
-						+ ".id = et" + nTag + ".subject_id ");
-			}
-			sb.append("WHERE ");
-
-			String connector = "";
-			for (int nTag = 2; nTag < asTags.length + 2; nTag++) {
-				sb.append(connector + " t" + nTag + ".name = ? ");
-				connector = " AND ";
-			}
-			sb.append(") ) ");
+			sbSQL.append(" AND e.grain_size = 'course' ");
+		for (int nTag = 0; nTag < asFilterTags.length; nTag++) {
+			sbSQL.append(" AND s" + nTag + ".name = ? ");
 		}
-		sb.append("GROUP BY subjects.id, subjects.name ");
-		sb.append("ORDER BY subjects.name ");
-		sb.append("LIMIT ?");
-		String sSql = sb.toString();
-//		 Logger.info(sSql);
-		PreparedStatement ps = cn.prepareStatement(sSql);
-		for (int nTag = 0; nTag < asTags.length; nTag++) {
-			ps.setString(nTag + 1, asTags[nTag]);
+		sbSQL.append(sTagCloudSQL3);
+//		Logger.info(sbSQL.toString());
+		PreparedStatement pst = cn.prepareStatement(sbSQL.toString());
+
+		// specify the tag filter and max tags
+		int nField = 1;
+		for (int nTag = 0; nTag < asFilterTags.length; nTag++) {
+			pst.setString(nField++, asFilterTags[nTag]);
 		}
-		ps.setInt(asTags.length + 1, nMaxTags);
-		return ps;
+		pst.setInt(nField, nMaxTags);
+		return pst;
 	}
-
 	
-	final static String sTagCloudSQL = "SELECT s.name, count(*) AS count "
-			+ "FROM entries_subjects AS es "
-			+ "INNER JOIN subjects AS s ON es.subject_id = s.id "
-			+ "INNER JOIN entries AS e ON es.entry_id = e.id " + ""
-			+ "WHERE e.language_id = ? " + "GROUP BY es.subject_id "
-			+ "ORDER BY count DESC " + "LIMIT ?";
-	final static String sGrainSizeTagCloudSQL = "SELECT s.name, count(*) AS count "
-			+ "FROM entries_subjects AS es "
-			+ "INNER JOIN subjects AS s ON es.subject_id = s.id "
-			+ "INNER JOIN entries AS e ON es.entry_id = e.id "
-			+ "WHERE e.grain_size = ? AND e.language_id = ? "
-			+ "GROUP BY es.subject_id " + "ORDER BY count DESC " + "LIMIT ?";
-	final static String sFilteredTagCloudSQL = "SELECT s2.name, count(*) AS count "
-			+ "FROM subjects AS s1 "
-			+ "INNER JOIN entries_subjects AS es ON s1.id = es.subject_id "
-			+ "INNER JOIN entries AS e ON es.entry_id = e.id "
-			+ "INNER JOIN entries_subjects AS es2 ON e.id = es2.entry_id "
-			+ "INNER JOIN subjects AS s2 ON es2.subject_id = s2.id "
-			+ "WHERE s1.name = ? AND e.language_id = ? "
-			+ "GROUP BY es2.subject_id " + "ORDER BY count DESC LIMIT ?";
-	final static String sGrainSizeFilteredTagCloudSQL = "SELECT s2.name, count(*) AS count "
-			+ "FROM subjects AS s1 "
-			+ "INNER JOIN entries_subjects AS es ON s1.id = es.subject_id "
-			+ "INNER JOIN entries AS e ON es.entry_id = e.id "
-			+ "INNER JOIN entries_subjects AS es2 ON e.id = es2.entry_id "
-			+ "INNER JOIN subjects AS s2 ON es2.subject_id = s2.id "
-			+ "WHERE e.grain_size = ? AND s1.name = ? AND e.language_id = ? "
-			+ "GROUP BY es2.subject_id " + "ORDER BY count DESC LIMIT ?";
-
 	private TagCloud updateCloud(String sGrainSize) throws Exception
 	{
-		try {
+		try 
+		{
+			cn = getConnection();
+			pstAddTagCloud = cn.prepareStatement("REPLACE INTO tag_clouds SET grain_size = ?, language_id = ?, filter = ?, tag_list = ?");
+	
+			Logger.info("Cloud: " + Locales.getCode(nLanguageID) + ", "  + sGrainSize + ", " + (sFilter == null ? "" : sFilter));
 			
-		cn = getConnection();
-		pstAddTagCloud = cn.prepareStatement("REPLACE INTO tag_clouds SET grain_size = ?, language_id = ?, filter = ?, tag_list = ?");
-
-		int nField = 1;
-//		Logger.info(sFilter + "," + sGrainSize);
-		if (sFilter != null && sFilter.contains("/")) 
-		{
-			pstGetTagCloud = getMultiTagStatement();
-		}
-		else 
-		{
-			if (sFilter == null) {
-				if ("course".equals(sGrainSize)) {
-					pstGetTagCloud = cn.prepareStatement(sGrainSizeTagCloudSQL);
-					pstGetTagCloud.setString(nField++,sGrainSize);
-				} else pstGetTagCloud = cn.prepareStatement(sTagCloudSQL);
-			} else {
-				if ("course".equals(sGrainSize)) {
-					pstGetTagCloud = cn.prepareStatement(sGrainSizeFilteredTagCloudSQL);
-					pstGetTagCloud.setString(nField++,sGrainSize);
-				} else pstGetTagCloud = cn.prepareStatement(sFilteredTagCloudSQL);
-				pstGetTagCloud.setString(nField++,sFilter);
-			}
-			pstGetTagCloud.setInt(nField++,nLanguageID);
-			pstGetTagCloud.setInt(nField,nMaxTags);
-		}
-		getTagCloud(pstGetTagCloud);
-		storeTagCloud(getTagCloudString());
-
-		if (nUpdatedClouds > 0) pstAddTagCloud.executeBatch();
-		pstAddTagCloud.close();
-		pstGetTagCloud.close();
-		cn.close();
-		pstAddTagCloud = null;
-		pstAddTagCloud = null;
-		pstGetTagCloud = null;
-		cn = null;
-		return this;
+			pstGetTagCloud = getCloudStatement(sGrainSize);
+			getTagCloud(pstGetTagCloud);
+			storeTagCloud(sGrainSize, getTagCloudString());
+	
+			if (nUpdatedClouds > 0) pstAddTagCloud.executeBatch();
+			pstAddTagCloud.close();
+			pstGetTagCloud.close();
+			cn.close();
+			pstAddTagCloud = null;
+			pstAddTagCloud = null;
+			pstGetTagCloud = null;
+			cn = null;
+			return this;
 		} 
 		catch (Exception e)
 		{
-		Logger.error(e);
-		throw e;
+			Logger.error("updateCloud error: ", e);
+			throw e;
 		}
 	}
 
@@ -230,33 +178,109 @@ public class TagCloud extends Base
 			return sTag2 + "/" + sTag1;
 	}
 
-	private static void updateLanguageClouds(int nLanguageID) throws Exception {
-		final int TOP_LEVEL_TAG_COUNT = 200;
-		TagCloud tc1 = new TagCloud(nLanguageID, TOP_LEVEL_TAG_COUNT).updateCloud("unknown");
-		tc1.updateCloud("course");
-
-		final int SECOND_LEVEL_TAG_COUNT = 100;
-		for (int nTag = 0; nTag < tc1.nTags; nTag++) 
+	private static void updateLanguageClouds(int nLanguageID, int nDepth) throws Exception 
+	{
+		updateGrainSizeLanguageClouds(nLanguageID, "unknown", nDepth);
+		updateGrainSizeLanguageClouds(nLanguageID, "course", nDepth);
+	}
+	
+	static final private String LEVEL1_CLOUD = "SELECT * FROM tag_clouds WHERE language_id = ? AND filter = ''";
+	static final private String LEVEL2_CLOUDS = "SELECT * FROM tag_clouds WHERE language_id = ? AND filter NOT like '%/%' AND filter != ''";
+	public Vector<TagCloud> getClouds(String sQuery, String sGrainSize) throws Exception
+	{
+		try
 		{
-			TagCloud tc2 = new TagCloud(nLanguageID, SECOND_LEVEL_TAG_COUNT,tc1.atf[nTag].sTerm).updateCloud("unknown");
-			tc2.updateCloud("course");
-			final int THIRD_LEVEL_TAG_COUNT = 100;
-			for (int nTag2 = 0; nTag2 < tc2.nTags; nTag2++) 
-			{
-				TagCloud tc3 = new TagCloud(nLanguageID, THIRD_LEVEL_TAG_COUNT, getFilter(tc1.atf[nTag].sTerm, tc2.atf[nTag2].sTerm)).updateCloud("unknown");
-				tc3.updateCloud("course");
+			cn = getConnection();
+			if ("course".equals(sGrainSize)) sQuery += " AND grain_size = 'course'";
+//			Logger.info(sQuery);
+			PreparedStatement ps = cn.prepareStatement(sQuery);
+			ps.setInt(1, nLanguageID);
+			ResultSet rs = ps.executeQuery();
+			Vector<TagCloud> vClouds = new Vector<TagCloud>();
+			if (rs.next()) {
+				TagCloud tc = new TagCloud(nLanguageID);
+				String[] asTags = rs.getString("tag_list").split(",");
+				tc.sFilter = rs.getString("filter");
+				tc.nTags = (asTags.length - 2) / 2;
+				tc.atf = new TermFrequency[tc.nTags];
+				for (int nTag = 0; nTag < tc.nTags; nTag++) {
+					tc.atf[nTag] = new TermFrequency(asTags[(nTag+1)*2]);
+				}
+				vClouds.add(tc);
 			}
+			rs.close();
+			ps.close();
+			cn.close();
+			return vClouds;
+		} 
+		catch(Exception e)
+		{
+			Logger.error("getClouds error: ", e);
+			throw e;
+		}
+	}
+	public TagCloud getTopLevelCloud(String sGrainSize) throws Exception
+	{
+		try {
+			Vector<TagCloud> vClouds = getClouds(LEVEL1_CLOUD, sGrainSize);
+			return vClouds.size() > 0 ? vClouds.firstElement() : new TagCloud();
+		} catch (Exception e) {
+			Logger.error("getTopLevelCloud error: ", e);
+			throw e;
+		}
+		
+	}
+	
+	private static void updateGrainSizeLanguageClouds(int nLanguageID, String sGrainSize, int nLevel) throws Exception 
+	{
+		try {
+		switch (nLevel)
+		{
+		case 1:
+		{
+			final int TOP_LEVEL_TAG_COUNT = 200;
+			new TagCloud(nLanguageID, TOP_LEVEL_TAG_COUNT).updateCloud(sGrainSize);
+			break;
+		}
+		case 2:
+		{
+			final int SECOND_LEVEL_TAG_COUNT = 50;
+			TagCloud tc = new TagCloud(nLanguageID).getTopLevelCloud(sGrainSize);
+			for (int nTag = 0; nTag < tc.nTags; nTag++) 
+			{
+				new TagCloud(nLanguageID, SECOND_LEVEL_TAG_COUNT,tc.atf[nTag].sTerm).updateCloud(sGrainSize);
+			}
+			break;
+		}
+		case 3:
+		{
+			Vector<TagCloud> vtc = new TagCloud(nLanguageID).getClouds(LEVEL2_CLOUDS, sGrainSize);
+			final int THIRD_LEVEL_TAG_COUNT = 50;
+			for (Enumeration<TagCloud> eClouds = vtc.elements(); eClouds.hasMoreElements();)
+			{
+				TagCloud tc = eClouds.nextElement();
+				for (int nTag = 0; nTag < tc.nTags; nTag++) 
+				{
+					new TagCloud(nLanguageID, THIRD_LEVEL_TAG_COUNT, getFilter(tc.sFilter, tc.atf[nTag].sTerm)).updateCloud(sGrainSize);
+				}
+			}
+			break;
+		}
+		}
+		} catch (Exception e) {
+			Logger.error("updateGrainSizeLanguageClouds error: ", e);
+			throw e;
 		}
 	}
 
-	public static void update() throws Exception 
+	public static void update(int nLevel) throws Exception 
 	{
+		Logger.status("==========================================================Generate Tag Clouds - Level: " + nLevel);
 		Logger.status("Updating tag clouds - begin");
 		for (Enumeration<Integer> eLanguageIDs = Locales.getLocaleIDs(); eLanguageIDs.hasMoreElements();) 
 		{
 			int nLanguageID = eLanguageIDs.nextElement();
-			Logger.info("Generating tag cloud for language: " + Locales.getCode(nLanguageID));
-			TagCloud.updateLanguageClouds(nLanguageID);
+			TagCloud.updateLanguageClouds(nLanguageID, nLevel);
 		}
 		Logger.status("Updating tag clouds - end");
 	}
@@ -266,9 +290,15 @@ public class TagCloud extends Base
 		try 
 		{
 			getLoggerAndDBOptions("recommenderd.properties");
-			update();
+			int nDepth = 3;
+			if (args.length > 0)try{nDepth = Integer.parseInt(args[0]);}catch(Exception nfe){}
+			for (int nLevel = 1; nLevel <= nDepth; nLevel++) {
+				update(nLevel);
+			}
+			update(3);
 		} catch (Exception e) {
 			Logger.error(e);
 		}
+		Logger.stopLogging();
 	}
 }

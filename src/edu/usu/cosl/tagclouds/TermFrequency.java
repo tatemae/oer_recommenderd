@@ -6,6 +6,9 @@ public class TermFrequency implements Comparable<TermFrequency>
 	public int nFrequency;
 	public boolean bSortOnName;
 	
+	public TermFrequency(String sTerm) {
+		this(sTerm,0,false);
+	}
 	public TermFrequency(String sTerm, int nFrequency) {
 		this(sTerm,nFrequency,false);
 	}

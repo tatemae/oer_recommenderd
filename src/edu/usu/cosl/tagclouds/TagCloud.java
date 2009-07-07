@@ -284,18 +284,24 @@ public class TagCloud extends Base
 		}
 		Logger.status("Updating tag clouds - end");
 	}
+	public static void update() throws Exception
+	{
+		for (int nLevel = 0; nLevel < 3; nLevel++) {
+			update(nLevel);
+		}
+	}
 
 	public static void main(String[] args) 
 	{
 		try 
 		{
 			getLoggerAndDBOptions("recommenderd.properties");
-			int nDepth = 3;
-			if (args.length > 0)try{nDepth = Integer.parseInt(args[0]);}catch(Exception nfe){}
-			for (int nLevel = 1; nLevel <= nDepth; nLevel++) {
+			if (args.length > 0) {
+				int nLevel = 1;
+				try{nLevel = Integer.parseInt(args[0]);}catch(Exception nfe){}
 				update(nLevel);
 			}
-			update(3);
+			else update();
 		} catch (Exception e) {
 			Logger.error(e);
 		}

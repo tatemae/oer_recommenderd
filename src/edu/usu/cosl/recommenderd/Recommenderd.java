@@ -12,6 +12,11 @@ public class Recommenderd extends Base
 	{
 		loadOptions(sPropertiesFile);
 		if (sAction.equals("skip_harvest")) bHarvest = false;
+		if (sAction.equals("rebuild")) {
+			bHarvest = false;
+			bReIndexAll = true;
+			bRedoAllRecommendations = true;
+		}
 	}
 	
 	private void processDocuments()
@@ -24,16 +29,16 @@ public class Recommenderd extends Base
 		
 		try
 		{
-			// update the index
-			if (bChanges || bReIndexAll) Indexer.update(bReIndexAll);
-			
-			if (bChanges) 
+			if (bChanges || bReIndexAll) 
 			{
+				// update the index
+				Indexer.update(bReIndexAll);
+				
 				// for subjects that have fewer than 5 subjects (tags), we autogenerate some more
 				SubjectAutoGenerator.update();
 				
 				// update to level tag clouds
-				TagCloud.update(1);
+				TagCloud.update();
 				
 				// seed the queries with common subjects
 //				QueryUpdater.update();
@@ -46,25 +51,18 @@ public class Recommenderd extends Base
 				// create recommendations for new users or update recommendations for old ones
 				PersonalRecommender.update();
 			}
-			if (bChanges) {
-				// update second and third level tag clouds
-				for (int nLevel = 2; nLevel <= nTagCloudDepth && nLevel <= 3; nLevel++) {
-					TagCloud.update(nLevel);
-				}
-			}
 		}
 		catch(Exception e){Logger.error(e);}
 
 		Logger.status("processDocuments - end");
 
 		notifyAdminOfResults();
-		
-		Logger.setLogFilePrefix(null);
 	}
 	
 	public static void update(String sPropertiesFile, String sAction)
 	{
 		new Recommenderd(sPropertiesFile, sAction).processDocuments();
+		Logger.stopLogging();
 	}
 	
 	public static void main(String[] args) 

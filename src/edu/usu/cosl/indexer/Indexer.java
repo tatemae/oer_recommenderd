@@ -195,8 +195,8 @@ public class Indexer extends Base
 					{
 						pstFlagEntryIndexed.executeBatch();
 					}
-					if (nEntry % 1000 == 0)Logger.status("Indexing: " + nEntry);
-					else if (nEntry % 100 == 0)Logger.info("Indexing: " + nEntry);
+					if (nEntry % 1000 == 0)Logger.status("Indexing: " + nEntry + "/" + vIDs.size());
+					else if (nEntry % 100 == 0)Logger.info("Indexing: " + nEntry + "/" + vIDs.size());
 				}
 				pstEntryToIndex.close();
 				pstFlagEntryIndexed.executeBatch();

@@ -120,7 +120,10 @@ public class PersonalRec extends DBThread
 		ResultSet rsDocSimilarity=stDocSimilarity.executeQuery("select * from recommendations");
 		while(rsDocSimilarity.next())
 		{
-			sd[rsDocSimilarity.getInt(2)-1][rsDocSimilarity.getInt(3)-1]=rsDocSimilarity.getDouble(5);
+			int entry_id=rsDocSimilarity.getInt(2);
+			int dest_entry_id=rsDocSimilarity.getInt(3);
+			double relevance=rsDocSimilarity.getDouble(5);
+			sd[entry_id-1][dest_entry_id-1]=relevance;
 		}
 		stDocSimilarity.close();
 		for(int i=0;i<num_Entry;i++)
@@ -155,14 +158,20 @@ public class PersonalRec extends DBThread
 		for(int i=0;i<num_User;i++)
 			for(int j=0;j<num_Entry;j++)
 			{
-				double summ=0.0;
+				/*double summ=0.0;
 				double sumrcf=0.0;
 				for(int l=0;l<num_Entry;l++)
 				{
 					summ+=rcf[i][l]*sd[l][j];
 					sumrcf+=rcf[i][l];
 				}
-				rscf[i][j]=summ/Math.max(sumrcf, eps);
+				rscf[i][j]=summ/Math.max(sumrcf, eps);*/
+				double max=0.0;
+				for(int l=0;l<num_Entry;l++)
+				{
+					max=Math.max(max, rcf[i][l]*sd[l][j]);
+				}
+				rscf[i][j]=max;
 			}
 		UpdateDB(rscf,num_User,num_Entry);
 		

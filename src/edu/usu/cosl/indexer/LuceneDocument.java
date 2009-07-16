@@ -35,7 +35,7 @@ public class LuceneDocument {
 	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
 	    doc.add(new Field("tag", entry.sDescription, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
 
-	    doc.add(new Field("grain_size", entry.sGrainSize, Field.Store.NO, Field.Index.UN_TOKENIZED));
+	    doc.add(new Field("grain_size_s", entry.sGrainSize, Field.Store.NO, Field.Index.UN_TOKENIZED));
 	    return doc;
 	  }
 	  catch (Exception e)

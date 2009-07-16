@@ -180,7 +180,7 @@ public class TagCloud extends Base
 
 	private static void updateLanguageClouds(int nLanguageID, int nDepth) throws Exception 
 	{
-		updateGrainSizeLanguageClouds(nLanguageID, "unknown", nDepth);
+		updateGrainSizeLanguageClouds(nLanguageID, "all", nDepth);
 		updateGrainSizeLanguageClouds(nLanguageID, "course", nDepth);
 	}
 	
@@ -197,7 +197,7 @@ public class TagCloud extends Base
 			ps.setInt(1, nLanguageID);
 			ResultSet rs = ps.executeQuery();
 			Vector<TagCloud> vClouds = new Vector<TagCloud>();
-			if (rs.next()) {
+			while (rs.next()) {
 				TagCloud tc = new TagCloud(nLanguageID);
 				String[] asTags = rs.getString("tag_list").split(",");
 				tc.sFilter = rs.getString("filter");
@@ -236,13 +236,13 @@ public class TagCloud extends Base
 		try {
 		switch (nLevel)
 		{
-		case 1:
+		case 0:
 		{
 			final int TOP_LEVEL_TAG_COUNT = 200;
 			new TagCloud(nLanguageID, TOP_LEVEL_TAG_COUNT).updateCloud(sGrainSize);
 			break;
 		}
-		case 2:
+		case 1:
 		{
 			final int SECOND_LEVEL_TAG_COUNT = 50;
 			TagCloud tc = new TagCloud(nLanguageID).getTopLevelCloud(sGrainSize);
@@ -252,7 +252,7 @@ public class TagCloud extends Base
 			}
 			break;
 		}
-		case 3:
+		case 2:
 		{
 			Vector<TagCloud> vtc = new TagCloud(nLanguageID).getClouds(LEVEL2_CLOUDS, sGrainSize);
 			final int THIRD_LEVEL_TAG_COUNT = 50;

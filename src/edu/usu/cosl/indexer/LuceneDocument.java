@@ -1,7 +1,9 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.indexer;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+
+import edu.usu.cosl.recommenderd.EntryInfo;
 
 public class LuceneDocument {
   public static Document Document(EntryInfo entry)
@@ -32,6 +34,8 @@ public class LuceneDocument {
 	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
 	    doc.add(new Field("tag", entry.sTitle, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
 	    doc.add(new Field("tag", entry.sDescription, Field.Store.YES, Field.Index.TOKENIZED, Field.TermVector.YES));
+
+	    doc.add(new Field("grain_size", entry.sGrainSize, Field.Store.NO, Field.Index.UN_TOKENIZED));
 	    return doc;
 	  }
 	  catch (Exception e)

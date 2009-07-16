@@ -5,32 +5,34 @@ import java.lang.Comparable;
 
 public class EntryInfo implements Comparable<EntryInfo>
 {
-	int nAggregationID;
-	int nFeedID;
-	int nEntryID;
+	public int nAggregationID;
+	public int nFeedID;
+	public int nEntryID;
 
-	int nLocalAggregationID;
-	int nLocalFeedID;
-	String sFeedURI;
-	String sFeedDisplayURI;
-	String sFeedTitle;
-	String sFeedShortTitle;
-	String sHarvestedFromTitle;
-	String sHarvestedFromShortTitle;
-	String sAuthor;
-    int nLanguageID;
-	int nLocalDocumentID;
-	int nRecommendationID;
+	public int nLocalAggregationID;
+	public int nLocalFeedID;
+	public String sFeedURI;
+	public String sFeedDisplayURI;
+	public String sFeedTitle;
+	public String sFeedShortTitle;
+	public String sHarvestedFromTitle;
+	public String sHarvestedFromShortTitle;
+	public String sAuthor;
+	public int nLanguageID;
+	public int nLocalDocumentID;
+	public int nRecommendationID;
 	
-	String sTitle;
-	String sURI;
-	String sDirectLink;
-	String sDescription;
-	double dRelevance;
-	int nClicks;
-	long lAvgTimeAtDest = 60;
+	public String sTitle;
+	public String sURI;
+	public String sDirectLink;
+	public String sDescription;
+	public double dRelevance;
+	public int nClicks;
+	public long lAvgTimeAtDest = 60;
 	
-	long lLastModified;
+	public long lLastModified;
+	
+	public String sGrainSize; 
 	
 	public EntryInfo(){}
 	public EntryInfo(ResultSet rsEntries) throws Exception
@@ -42,6 +44,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 		sTitle = rsEntries.getString("title");
 		sDescription = rsEntries.getString("description");
 		nLanguageID = rsEntries.getInt("language_id");
+		sGrainSize = rsEntries.getString("grain_size");
 	}
 	public int compareTo(EntryInfo e){return this.lAvgTimeAtDest > e.lAvgTimeAtDest ? 1 : this.lAvgTimeAtDest == e.lAvgTimeAtDest ? 0 : -1;}
 }

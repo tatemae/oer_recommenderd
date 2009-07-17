@@ -2,6 +2,8 @@ package edu.usu.cosl.recommenderd;
 
 import edu.usu.cosl.aggregatord.Harvester;
 import edu.usu.cosl.indexer.Indexer;
+import edu.usu.cosl.recommender.PersonalRecommender;
+import edu.usu.cosl.recommender.Recommender;
 import edu.usu.cosl.tagclouds.TagCloud;
 import edu.usu.cosl.tagclouds.SubjectAutoGenerator;
 import edu.usu.cosl.util.Logger;

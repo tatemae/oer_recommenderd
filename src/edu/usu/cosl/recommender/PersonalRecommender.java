@@ -1,7 +1,8 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.recommender;
 
 import java.sql.Statement;
 
+import edu.usu.cosl.recommenderd.Base;
 import edu.usu.cosl.util.Logger;
 
 public class PersonalRecommender extends Base

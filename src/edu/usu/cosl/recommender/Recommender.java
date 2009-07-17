@@ -1,4 +1,4 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.recommender;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,6 +22,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.similar.MoreLikeThis;
 
+import edu.usu.cosl.recommenderd.Base;
+import edu.usu.cosl.recommenderd.EntryInfo;
 import edu.usu.cosl.util.Locales;
 import edu.usu.cosl.util.Logger;
 
@@ -33,8 +35,9 @@ public class Recommender extends Base
 	private PreparedStatement pstAddRecommendation;
 	private PreparedStatement pstUpdateRecommendation;
 	private PreparedStatement pstSetDocumentRecommendations;
+	private PreparedStatement pstGetEntryRecommendations;
 	
-	private void updateRecommendations(Vector<Integer> vIDs)
+	private void updateRecommendations(Vector<Integer> vIDs, boolean bGenerateRecommendations)
 	{
 		try
 		{
@@ -63,6 +66,8 @@ public class Recommender extends Base
 				pstFlagEntryRecommended = cn.prepareStatement(
 					"UPDATE entries SET relevance_calculated_at = now() WHERE id = ?");
 		
+				pstGetEntryRecommendations = cn.prepareStatement("SELECT e.*, e.id AS id, r.id AS recommendation_id, f.short_title FROM recommendations AS r INNER JOIN entries AS e ON r.dest_entry_id = e.id INNER JOIN feeds f ON e.feed_id = f.id WHERE entry_id = ?");
+			
 				PreparedStatement pstEntryToCreateRecommendationsFor = cn.prepareStatement(
 					"SELECT id, feed_id, permalink, direct_link, title, description, language_id, grain_size " +
 					"FROM entries WHERE id = ?");
@@ -73,7 +78,11 @@ public class Recommender extends Base
 					ResultSet rsEntryToCreateRecommendationsFor = pstEntryToCreateRecommendationsFor.executeQuery();
 					if (rsEntryToCreateRecommendationsFor.next())
 					{
-						updateRecommendationsForEntry(new EntryInfo(rsEntryToCreateRecommendationsFor));
+						if (bGenerateRecommendations) {
+							updateRecommendationsForEntry(new EntryInfo(rsEntryToCreateRecommendationsFor));
+						} else {
+							updateRecommendationCacheForEntry(new EntryInfo(rsEntryToCreateRecommendationsFor));
+						}
 						nEntry++;
 					}
 					rsEntryToCreateRecommendationsFor.close();
@@ -81,17 +90,17 @@ public class Recommender extends Base
 					{
 						pstSetDocumentRecommendations.executeBatch();
 						pstUpdateRecommendation.executeBatch();
-						pstAddRecommendation.executeBatch();
 					}
 					if (nEntry % 1000 == 0)Logger.status("Recommending: " + nEntry);
 					else if (nEntry % 100 == 0)Logger.info("Recommending: " + nEntry);
 				}
 				pstEntryToCreateRecommendationsFor.close();
+				
+				pstGetEntryRecommendations.close();
 	
 				pstFlagEntryRecommended.executeBatch();
 				pstSetDocumentRecommendations.executeBatch();
 				pstUpdateRecommendation.executeBatch();
-				pstAddRecommendation.executeBatch();
 				
 				pstFlagEntryRecommended.close();
 				pstSetDocumentRecommendations.close();
@@ -178,6 +187,9 @@ public class Recommender extends Base
 	
 	static private String getEntryJSON(EntryInfo entry)
 	{
+		if (entry.nRecommendationID == 0) {
+			Logger.info("oh no!");
+		}
 		return "{" 
 		+ "\"id\": " + entry.nRecommendationID 
 		+ ", \"uri\": \"" + entry.sURI + "\"" 
@@ -209,17 +221,26 @@ public class Recommender extends Base
 		
 		Vector<EntryInfo> vPopular = new Vector<EntryInfo>(); 
 		
+		// sort the list into popular, relevant, and other
 		for (Enumeration<EntryInfo> eRelatedEntries = vRelatedEntries.elements(); eRelatedEntries.hasMoreElements();)
 		{
 			EntryInfo relatedEntry = eRelatedEntries.nextElement();
+			
+			// popular recommendations have more than one standard deviation of clicks above the average
 			if (relatedEntry.nClicks >= nClickThreshold)
 			{
 				vPopular.add(relatedEntry);
 				continue;
 			}
 			String sJSON = getEntryJSON(relatedEntry);
-			if (relatedEntry.dRelevance > dThreshold) sRelevant += sRelevant.length() > 1 ? "," + sJSON : sJSON; 
-			else sOther += sOther.length() > 1 ? "," + sJSON : sJSON;
+			
+			// relevant recommendations have a relevance more than one standard deviation above the average
+			if (relatedEntry.dRelevance > dThreshold) { 
+				sRelevant += sRelevant.length() > 1 ? "," + sJSON : sJSON;
+			// other is everything else
+			} else { 
+				sOther += sOther.length() > 1 ? "," + sJSON : sJSON;
+			}
 		}
 		
 		// sort the popular entries by average time on page
@@ -309,6 +330,8 @@ public class Recommender extends Base
 			hsRecommendations.add(entry.sURI);
 			if (entry.sDirectLink != null) hsRecommendations.add(entry.sDirectLink);
 			int nHit = 0;
+			
+			// loop through the related entries
 		    for (HitIterator docs = (HitIterator)relatedDocs.iterator(); docs.hasNext() && !(nSameDomainHits == nMaxRecommendations && nOtherDomainHits == nMaxRecommendations) && nHit < 100;)
 		    {
 				nHit++;
@@ -371,6 +394,7 @@ public class Recommender extends Base
 
 			    	vEntries.add(relatedEntry);
 
+			    	// keep track of titles and uris so we don't duplicate them
 			    	hsRecommendations.add(sNormalizedTitle);
 					hsRecommendations.add(sURI);
 					if (sDirectLink != null) hsRecommendations.add(sDirectLink);
@@ -383,6 +407,46 @@ public class Recommender extends Base
 			Logger.error(e);
 		}
 		return vEntries;
+	}
+
+	private Vector<EntryInfo> getRelatedEntriesFromDB(EntryInfo entry) throws Exception
+	{
+		try
+		{
+			Vector<EntryInfo> vEntries = new Vector<EntryInfo>();
+			pstGetEntryRecommendations.setInt(1, entry.nEntryID);
+			ResultSet rsRecommendations = pstGetEntryRecommendations.executeQuery();
+			while (rsRecommendations.next()) {
+				EntryInfo e = new EntryInfo(rsRecommendations);
+				e.nRecommendationID = rsRecommendations.getInt("recommendation_id");
+				e.sFeedShortTitle = rsRecommendations.getString("short_title");
+				vEntries.add(e);
+			}
+			rsRecommendations.close();
+			return vEntries;
+		}
+		catch (Exception e)
+		{
+			Logger.error("Error in getRelatedEntriesFromDB", e);
+			throw e;
+		}
+	}
+	
+	private void updateRecommendationCacheForEntry(EntryInfo entry) throws Exception
+	{
+		try
+		{
+			Vector<EntryInfo> vRecommendations = getRelatedEntriesFromDB(entry);
+			if (vRecommendations.size() > 0)
+			{
+				storeRecommendationsInEntry(entry,vRecommendations);
+			}
+		}
+		catch (Exception e)
+		{
+			Logger.error("Error in updateRecommendationCacheForEntry");
+			throw e;
+		}
 	}
 	
 	private void updateRecommendationsForEntry(EntryInfo entry) throws Exception
@@ -407,13 +471,12 @@ public class Recommender extends Base
 	
 	private void addRecommendation(EntryInfo entry, EntryInfo relatedEntry, int nRank) throws SQLException
 	{
-//		relatedEntry.nRecommendationID = getNextID("recommendations");
-//		pstAddRecommendation.setInt(1, relatedEntry.nRecommendationID);
 		pstAddRecommendation.setInt(1, entry.nEntryID);
 		pstAddRecommendation.setInt(2, relatedEntry.nEntryID);
 		pstAddRecommendation.setInt(3, nRank);
 		pstAddRecommendation.setDouble(4, relatedEntry.dRelevance);
-		pstAddRecommendation.addBatch();
+		pstAddRecommendation.execute();
+		entry.nRecommendationID = getLastID(pstAddRecommendation);
 	}
 	
 	private void updateRecommendation(EntryInfo relatedEntry, int nRank) throws SQLException
@@ -432,6 +495,9 @@ public class Recommender extends Base
 		if (rsRecommendationID.next())
 		{
 			relatedEntry.nRecommendationID = rsRecommendationID.getInt("id");
+			if (relatedEntry.nRecommendationID == 0) {
+				Logger.info("oh crap");
+			}
 			relatedEntry.nClicks = rsRecommendationID.getInt("clicks");
 			relatedEntry.lAvgTimeAtDest = rsRecommendationID.getLong("avg_time_at_dest");
 		}
@@ -476,22 +542,48 @@ public class Recommender extends Base
 		Vector<Integer> vIDs = getIDsOfEntries(bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at");
 		if (vIDs.size() > 0) {
 			Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
-			updateRecommendations(vIDs);
+			updateRecommendations(vIDs, true);
 			Logger.status("updateRecommendations - end");
+		}
+		cn.close();
+	}
+	
+	private void updateCache() throws Exception
+	{
+		Logger.status("==========================================================Rebuild recommendation caches");
+		cn = getConnection();
+		Vector<Integer> vIDs = getIDsOfEntries("");
+		if (vIDs.size() > 0) {
+			Logger.status("updateRecommendationCache - begin (entries to update): " + vIDs.size());
+			updateRecommendations(vIDs, false);
+			Logger.status("updateRecommendationCache - end");
 		}
 		cn.close();
 	}
 
 	public static void update(boolean bRedoAllRecommendations) throws Exception
 	{
-		new Recommender().updateRecommendations(bRedoAllRecommendations);
+		Recommender r = new Recommender();
+		r.loadOptions("recommenderd.properties");
+		r.updateRecommendations(bRedoAllRecommendations);
+	}
+
+	public static void rebuildCache() throws Exception
+	{
+		Recommender r = new Recommender();
+		r.loadOptions("recommenderd.properties");
+		r.updateCache();
 	}
 	
 	public static void main(String[] args) 
 	{
 		try {
-			getLoggerAndDBOptions("recommenderd.properties");
-			update(true);
+			if (args.length > 0 && "rebuild_cache".equals(args[0])) {
+				rebuildCache();
+			} else {
+				update(true);
+			}
+			Logger.stopLogging();
 		} catch (Exception e) {
 			Logger.error(e);
 		}

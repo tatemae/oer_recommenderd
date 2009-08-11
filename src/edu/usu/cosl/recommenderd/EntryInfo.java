@@ -2,6 +2,7 @@ package edu.usu.cosl.recommenderd;
 
 import java.sql.ResultSet;
 import java.lang.Comparable;
+import java.util.Vector;
 
 public class EntryInfo implements Comparable<EntryInfo>
 {
@@ -29,6 +30,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 	public double dRelevance;
 	public int nClicks;
 	public long lAvgTimeAtDest = 60;
+	public Vector<String> vSubjects;
 	
 	public long lLastModified;
 	

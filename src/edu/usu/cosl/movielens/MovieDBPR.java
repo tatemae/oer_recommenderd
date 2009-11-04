@@ -1,4 +1,4 @@
-package edu.usu.cosl.recommenderd;
+package edu.usu.cosl.movielens;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

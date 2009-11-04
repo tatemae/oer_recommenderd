@@ -1,5 +1,7 @@
 package edu.usu.cosl.recommenderd;
 
+import java.io.IOException;
+
 import edu.usu.cosl.aggregatord.Harvester;
 import edu.usu.cosl.indexer.Indexer;
 import edu.usu.cosl.recommender.PersonalRecommender;
@@ -8,8 +10,8 @@ import edu.usu.cosl.tagclouds.SubjectAutoGenerator;
 import edu.usu.cosl.tagclouds.TagCloud;
 
 public class Recommenderd extends Base {
-
-	public Recommenderd(String sPropertiesFile, String sAction) {
+	
+	public Recommenderd(String sPropertiesFile, String sAction) throws IOException {
 		loadOptions(sPropertiesFile);
 		if (sAction.equals("skip_harvest"))
 			bHarvest = false;
@@ -20,13 +22,13 @@ public class Recommenderd extends Base {
 		}
 	}
 
-	private void processDocuments() {
-		logger.info("processDocuments - begin");
+	private void processDocuments(String sPropertiesFile) throws IOException {
+		logger.debug("processDocuments - begin");
 
 		// use the aggregator to get any new records
 		boolean bChanges = true;
 		if (bHarvest)
-			bChanges = Harvester.harvest();
+			bChanges = Harvester.harvest(sPropertiesFile);
 
 		if (isShutdownRequested()) return;
 		
@@ -65,24 +67,27 @@ public class Recommenderd extends Base {
 			logger.error(e);
 		}
 
-		logger.info("processDocuments - end");
+		logger.debug("processDocuments - end");
 
 		if (isShutdownRequested()) return;
 
 		notifyAdminOfResults();
 	}
 	
-	public static void update(String sPropertiesFile, String sAction) {
-		new Recommenderd(sPropertiesFile, sAction).processDocuments();
-		// logger.stopLogging();
-	}
-
 	public static void main(String[] args) {
-		startup();
-		while (!isShutdownRequested()) {
-			update("recommenderd.properties", args.length > 0 ? args[0] : "");
-			try{Thread.sleep(60*1000);}catch(InterruptedException e){}
+		System.out.println(" INFO [main] (Recommender daemon starting up");
+		if (startup()) {
+			try {
+				String sPropertiesFile = "recommenderd.properties";
+				String sAction = args.length > 0 ? args[0] : "";
+				Recommenderd daemon = new Recommenderd(sPropertiesFile, sAction);
+
+				while (!isShutdownRequested()) {
+					daemon.processDocuments(sPropertiesFile);
+					if(!isShutdownRequested())
+						try{Thread.sleep(60*1000);}catch(InterruptedException e){}
+				}
+			}catch (IOException e) {}
 		}
-		// do shutdown actions
 	}
 }

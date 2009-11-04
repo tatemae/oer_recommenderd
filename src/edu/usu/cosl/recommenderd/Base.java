@@ -1,7 +1,8 @@
 package edu.usu.cosl.recommenderd;
 
-import java.sql.Connection;
+import java.io.IOException;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -11,8 +12,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
-
-import org.apache.log4j.Logger;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexReader;
@@ -66,7 +65,7 @@ public class Base extends DBThread
 	protected boolean bRedoAllRecommendations = false;
 	protected boolean bReIndexAll = false;
 	
-	protected void loadOptions(String sPropertiesFile)
+	protected void loadOptions(String sPropertiesFile) throws IOException
 	{
 	    try 
 	    {
@@ -95,7 +94,10 @@ public class Base extends DBThread
 	        
 	        getLoggerAndDBOptions(properties);
 	    }
-	    catch(Exception e){logger.error(e);}
+	    catch(IOException e){
+	    	logger.error(e);
+	    	throw(e);
+	    }
 	    
 	    configSolrLogging();
 	}

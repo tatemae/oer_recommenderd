@@ -507,6 +507,7 @@ public class Recommender extends Base
 
 	private void addRecommendationsToDB(EntryInfo entry, Vector<EntryInfo> vRelatedEntries) throws SQLException
 	{
+		Logger.status("addrec");
 		try
 		{
 			int nRank = 1;
@@ -583,10 +584,10 @@ public class Recommender extends Base
 			} else {
 				update(true);
 			}
-			Logger.stopLogging();
 		} catch (Exception e) {
 			Logger.error(e);
 		}
+		Logger.stopLogging();
 	}
 
 }

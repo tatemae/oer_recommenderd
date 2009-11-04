@@ -1,27 +1,32 @@
 package edu.usu.cosl.recommenderd;
 
 import java.sql.Connection;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import org.apache.log4j.Logger;
+
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.FSDirectory;
+
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreContainer.Initializer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 
 import edu.usu.cosl.util.DBThread;
-import edu.usu.cosl.util.Logger;
 import edu.usu.cosl.util.SendMail;
+
 
 public class Base extends DBThread 
 {
@@ -73,7 +78,7 @@ public class Base extends DBThread
 	        sValue = properties.getProperty("smtp_server");
 	        if (sValue != null) {
 	        	sSMTPServer = sValue;
-	        	Logger.setLogToString(true);
+//	        	Logger.setLogToString(true);
 	        }
 	        sValue = properties.getProperty("admin_email");
 	        if (sValue != null) sAdminEmail = sValue;
@@ -86,23 +91,23 @@ public class Base extends DBThread
 	        sValue = properties.getProperty("solr_config_filename");
 	        if (sValue != null && System.getProperty("solr.solr.home") == null) sSolrConfigFilename = sValue;
 	        sValue = properties.getProperty("tag_cloud_depth");
-	        if (sValue != null) try{nTagCloudDepth = Integer.parseInt(sValue);}catch(Exception nfe){Logger.error("Unable to read tag_cloud_depth option value",nfe);} 
+	        if (sValue != null) try{nTagCloudDepth = Integer.parseInt(sValue);}catch(Exception nfe){logger.error("Unable to read tag_cloud_depth option value",nfe);} 
 	        
 	        getLoggerAndDBOptions(properties);
 	    }
-	    catch(Exception e){Logger.error(e);}
+	    catch(Exception e){logger.error(e);}
 	    
 	    configSolrLogging();
 	}
 	
 	private String sSMTPServer = null;
 	private String sAdminEmail = null;
-	final static String sEmailFrom = "oerrecomender@cosl.usu.edu";
-	final static String sReportSubject = "OER Recommender Harvest Report";
+	final static String sEmailFrom = "info@folksemantic.com";
+	final static String sReportSubject = "Folksemantic Daemon Report";
 	public void notifyAdminOfResults()
 	{
-		if (sSMTPServer != null) 
-			SendMail.sendMsg(sSMTPServer, sEmailFrom, sAdminEmail, sReportSubject, Logger.getMessages());
+//		if (sSMTPServer != null) 
+//			SendMail.sendMsg(sSMTPServer, sEmailFrom, sAdminEmail, sReportSubject, Logger.getMessages());
 	}
 
 	static protected String quoteEncode(String sText)

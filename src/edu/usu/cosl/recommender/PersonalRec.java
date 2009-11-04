@@ -9,7 +9,6 @@ import java.sql.SQLException;
 import java.lang.Math;
 
 import edu.usu.cosl.util.DBThread;
-import edu.usu.cosl.util.Logger;
 
 public class PersonalRec extends DBThread
 {
@@ -18,7 +17,7 @@ public class PersonalRec extends DBThread
 	
 	public void updatePersonalRecommendations_SS() throws SQLException
 	{
-		Logger.info("updatePersonalRecommendations-begin");
+		logger.info("updatePersonalRecommendations-begin");
 		
 		Statement stTruncPersonalRec=cnRecommender.createStatement();
 		stTruncPersonalRec.executeQuery("TRUNCATE TABLE personal_recommendations");
@@ -34,7 +33,7 @@ public class PersonalRec extends DBThread
 		pstAddPersonalRec.execute();
 		pstAddPersonalRec.close();
 		
-		Logger.info("updatePersonalRecommendations-end");
+		logger.info("updatePersonalRecommendations-end");
 	}
 	public void updatePersonalRecommendations_CF() throws SQLException
 	{

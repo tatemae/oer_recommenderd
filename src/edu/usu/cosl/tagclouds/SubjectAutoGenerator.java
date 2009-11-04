@@ -19,7 +19,6 @@ import org.apache.solr.core.SolrCore;
 
 import edu.usu.cosl.recommenderd.Base;
 import edu.usu.cosl.util.Locales;
-import edu.usu.cosl.util.Logger;
 
 public class SubjectAutoGenerator extends Base 
 {
@@ -57,7 +56,7 @@ public class SubjectAutoGenerator extends Base
 	    	    }
 		    }
 		} catch (Exception e) {
-			Logger.error("autoGenerateSubjects-error: ", e);
+			logger.error("autoGenerateSubjects-error: ", e);
 		}
 	}
 	
@@ -83,7 +82,7 @@ public class SubjectAutoGenerator extends Base
 						try {
 							pstAddEntrySubject.executeBatch();
 						}catch(Exception e) {
-							Logger.error("Error adding entry subjects: ", e);
+							logger.error("Error adding entry subjects: ", e);
 						}
 						nNewEntrySubjects = 0;
 					}
@@ -122,8 +121,8 @@ public class SubjectAutoGenerator extends Base
 	
 	private void autoGenerateSubjects() throws Exception
 	{
-		Logger.status("==========================================================Auto Generate Subjects");
-		Logger.status("Auto generating subjects - begin");
+		logger.info("==========================================================Auto Generate Subjects");
+		logger.info("Auto generating subjects - begin");
 	
 		createAnalyzers();
 		createIndexReaders();
@@ -151,7 +150,7 @@ public class SubjectAutoGenerator extends Base
 			// ask the db for the entries that have been updated or added for the language
 			int nLanguageID = Locales.getID(sLanguageCode);
 			Vector<Integer> vIDs = getIDsOfEntries("WHERE indexed_at > relevance_calculated_at AND language_id = " + nLanguageID);
-			Logger.status("Generating subjects for entries (" + sLanguageCode + "): " + vIDs.size());
+			logger.info("Generating subjects for entries (" + sLanguageCode + "): " + vIDs.size());
 			int nEntry = 0;
 			for(Enumeration<Integer> eID = vIDs.elements(); eID.hasMoreElements();)
 			{
@@ -174,7 +173,7 @@ public class SubjectAutoGenerator extends Base
 				if (nSubjects < 5) {
 					autoGenerateSubjects(hsSubjects, nEntryID, nSubjects, reader, searcher);
 				}
-				if (++nEntry % 100 == 0) Logger.info("Generating subjects: " + nEntry + "/" + vIDs.size());
+				if (++nEntry % 100 == 0) logger.debug("Generating subjects: " + nEntry + "/" + vIDs.size());
 			}
 			// close the index searcher and reader
 			searcher.close();
@@ -186,7 +185,7 @@ public class SubjectAutoGenerator extends Base
 			try {
 				pstAddEntrySubject.executeBatch();
 			}catch(Exception e) {
-				Logger.error("Error adding entry subjects: ", e);
+				logger.error("Error adding entry subjects: ", e);
 			}
 		}
 		pstGetSubjectID.close();
@@ -198,7 +197,7 @@ public class SubjectAutoGenerator extends Base
 		closeIndexReaders();
 		closeCores();
 
-		Logger.status("Auto generating subjects - end");
+		logger.info("Auto generating subjects - end");
 	}
 
 	public static void update() throws Exception
@@ -212,9 +211,8 @@ public class SubjectAutoGenerator extends Base
 			getLoggerAndDBOptions("recommenderd.properties");
 			update();
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
-		Logger.stopLogging();
 	}
 
 }

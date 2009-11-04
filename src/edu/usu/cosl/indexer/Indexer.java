@@ -18,7 +18,6 @@ import org.apache.solr.core.SolrCore;
 
 import edu.usu.cosl.recommenderd.EntryInfo;
 import edu.usu.cosl.util.Locales;
-import edu.usu.cosl.util.Logger;
 import edu.usu.cosl.recommenderd.Base;
 
 public class Indexer extends Base
@@ -146,13 +145,13 @@ public class Indexer extends Base
 			Vector<EntryInfo> vEntries = getIndexEntriesNotInDB();
 			if (vEntries.size() > 0)
 			{
-				Logger.status("Deleting entries in index but not in DB: " + vEntries.size());
+				logger.info("Deleting entries in index but not in DB: " + vEntries.size());
 				removeDeletedEntriesFromIndex(vEntries);
 			}
 		}
 		catch (Exception e)
 		{
-			Logger.error("cleanupIndex ", e);
+			logger.error("cleanupIndex ", e);
 		}
 	}
 	
@@ -169,7 +168,7 @@ public class Indexer extends Base
 			}
 			rsSubjects.close();
 		}catch(Exception e) {
-			Logger.error("Error in getSubjects: ", e);
+			logger.error("Error in getSubjects: ", e);
 		}
 		return vSubjects;
 	}
@@ -199,7 +198,7 @@ public class Indexer extends Base
 
 				//Vector<Integer> vIDs = getIDsOfEntries(bAll ? "WHERE substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')" : "WHERE harvested_at > indexed_at AND substring(language,1,2) IN ('en', 'es', 'zh', 'fr', 'ja', 'de', 'ru', 'nl')");
 				Vector<Integer> vIDs = getIDsOfEntries(bAll ? "": "WHERE harvested_at > indexed_at");
-				Logger.status("updateIndex - begin (entries to update): " + vIDs.size());
+				logger.info("updateIndex - begin (entries to update): " + vIDs.size());
 				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
 				{
 					pstEntryToIndex.setInt(1, eIDs.nextElement().intValue());
@@ -217,8 +216,8 @@ public class Indexer extends Base
 					{
 						pstFlagEntryIndexed.executeBatch();
 					}
-					if (nEntry % 1000 == 0)Logger.status("Indexing: " + nEntry + "/" + vIDs.size());
-					else if (nEntry % 100 == 0)Logger.info("Indexing: " + nEntry + "/" + vIDs.size());
+					if (nEntry % 1000 == 0)logger.info("Indexing: " + nEntry + "/" + vIDs.size());
+					else if (nEntry % 100 == 0)logger.debug("Indexing: " + nEntry + "/" + vIDs.size());
 				}
 				pstEntrySubjects.close();
 				pstEntryToIndex.close();
@@ -227,19 +226,19 @@ public class Indexer extends Base
 			}
 			catch (SQLException e)
 			{
-				Logger.error("updateIndex(1) - ", e);
+				logger.error("updateIndex(1) - ", e);
 			}
 			catch (Exception e)
 			{
-				Logger.error("updateIndex(2) - ", e);
+				logger.error("updateIndex(2) - ", e);
 			}
 			closeIndexWriters();
 		}
 		catch (Exception e)
 		{
-			Logger.error("updateIndex(3) - ", e);
+			logger.error("updateIndex(3) - ", e);
 		}
-		Logger.status("updateIndex - end");
+		logger.info("updateIndex - end");
 	}
 
 	private Vector<Integer> getEntriesPointingAtEntries(Vector<EntryInfo> vDeletedEntries) throws SQLException
@@ -307,7 +306,7 @@ public class Indexer extends Base
 		Vector<EntryInfo> vEntries = getDeletedEntries();
 		if (vEntries.size() == 0) return;
 		
-		Logger.status("Deleting entries: " + vEntries.size());
+		logger.info("Deleting entries: " + vEntries.size());
 		
 		try
 		{
@@ -318,7 +317,7 @@ public class Indexer extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("updateForDeletedEntries", e);
+			logger.error("updateForDeletedEntries", e);
 		}
 	}
 	
@@ -354,8 +353,8 @@ public class Indexer extends Base
 	
 	public void updateIndexes(boolean bReIndexAll) throws Exception
 	{
-		Logger.status("==========================================================Index");
-		Logger.status("Updating indexes - begin");
+		logger.info("==========================================================Index");
+		logger.info("Updating indexes - begin");
 		setupPreparedStatements(); 
 		createAnalyzers();
 		updateForDeletedEntries();
@@ -363,7 +362,7 @@ public class Indexer extends Base
 		cleanupIndex();
 		closeCores();
 		closePreparedStatements();
-		Logger.status("Updating indexes - end");
+		logger.info("Updating indexes - end");
 	}
 		
 	public static void update(boolean bReIndexAll) throws Exception
@@ -377,8 +376,7 @@ public class Indexer extends Base
 			getLoggerAndDBOptions("recommenderd.properties");
 			update(args.length > 0 && args[0].equals("all"));
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
-		Logger.stopLogging();
 	}
 }

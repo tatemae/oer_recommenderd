@@ -5,13 +5,12 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import edu.usu.cosl.recommenderd.Base;
-import edu.usu.cosl.util.Logger;
 
 public class QueryUpdater extends Base {
 
 	private void updateQueries()
 	{
-		Logger.info("updateQueries - begin");
+		logger.info("updateQueries - begin");
 
 		try
 		{
@@ -61,9 +60,9 @@ public class QueryUpdater extends Base {
 		}
 		catch (Exception e)
 		{
-			Logger.error("updateQueries - ", e);
+			logger.error("updateQueries - ", e);
 		}
-		Logger.info("updateQueries - end");
+		logger.info("updateQueries - end");
 	}
 
 	public static void update() throws Exception
@@ -77,9 +76,8 @@ public class QueryUpdater extends Base {
 			getLoggerAndDBOptions("recommenderd.properties");
 			update();
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
-		Logger.stopLogging();
 	}
 
 }

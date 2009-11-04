@@ -25,7 +25,6 @@ import org.apache.lucene.search.similar.MoreLikeThis;
 import edu.usu.cosl.recommenderd.Base;
 import edu.usu.cosl.recommenderd.EntryInfo;
 import edu.usu.cosl.util.Locales;
-import edu.usu.cosl.util.Logger;
 
 public class Recommender extends Base 
 {
@@ -91,8 +90,8 @@ public class Recommender extends Base
 						pstSetDocumentRecommendations.executeBatch();
 						pstUpdateRecommendation.executeBatch();
 					}
-					if (nEntry % 1000 == 0)Logger.status("Recommending: " + nEntry);
-					else if (nEntry % 100 == 0)Logger.info("Recommending: " + nEntry);
+					if (nEntry % 1000 == 0)logger.info("Recommending: " + nEntry);
+					else if (nEntry % 100 == 0)logger.debug("Recommending: " + nEntry);
 				}
 				pstEntryToCreateRecommendationsFor.close();
 				
@@ -111,7 +110,7 @@ public class Recommender extends Base
 			}
 		    catch (Exception e)
 		    {
-				Logger.error("updateRecommendations(1) - ", e);
+				logger.error("updateRecommendations(1) - ", e);
 		    }
 		    closeIndexSearchers();
 		    closeIndexReaders();
@@ -119,7 +118,7 @@ public class Recommender extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("updateRecommendations(2) - ", e);
+			logger.error("updateRecommendations(2) - ", e);
 		}
 	}
 
@@ -188,7 +187,7 @@ public class Recommender extends Base
 	static private String getEntryJSON(EntryInfo entry)
 	{
 		if (entry.nRecommendationID == 0) {
-			Logger.info("oh no!");
+			logger.debug("oh no!");
 		}
 		return "{" 
 		+ "\"id\": " + entry.nRecommendationID 
@@ -256,8 +255,8 @@ public class Recommender extends Base
 		sRelevant += "]";
 		sOther += "]";
 		
-//		Logger.info("Relevant: " + sRelevant);
-//		Logger.info("Other: " + sOther);
+//		logger.debug("Relevant: " + sRelevant);
+//		logger.debug("Other: " + sOther);
 		
 		pstSetDocumentRecommendations.setString(1, sPopular);
 		pstSetDocumentRecommendations.setString(2, sRelevant);
@@ -371,7 +370,7 @@ public class Recommender extends Base
 					 || (dRelevance > 0.99 && sNormalizedTitle.equals(sNormalizedEntryTitle)) // perfect relevance and same title as the source document
 				   ))
 				{
-//					Logger.info("hit: " + nHit++);
+//					logger.debug("hit: " + nHit++);
 					boolean bSameDomain = sURI.startsWith(sDomain);
 					
 					if (nSameDomainHits == nMaxRecommendations && bSameDomain ||
@@ -390,7 +389,7 @@ public class Recommender extends Base
 			    	relatedEntry.nFeedID = intFeedID.intValue();
 			    	relatedEntry.sFeedShortTitle = lDoc.getField("collection").stringValue(); 
 			    	
-//			    	Logger.info("Relevance:" + relatedEntry.dRelevance + " " + nSameDomainHits + ", " + nOtherDomainHits);
+//			    	logger.debug("Relevance:" + relatedEntry.dRelevance + " " + nSameDomainHits + ", " + nOtherDomainHits);
 
 			    	vEntries.add(relatedEntry);
 
@@ -403,8 +402,8 @@ public class Recommender extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("Error processing getRelatedEntries for entry ID: " + entry.nEntryID);
-			Logger.error(e);
+			logger.error("Error processing getRelatedEntries for entry ID: " + entry.nEntryID);
+			logger.error(e);
 		}
 		return vEntries;
 	}
@@ -427,7 +426,7 @@ public class Recommender extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("Error in getRelatedEntriesFromDB", e);
+			logger.error("Error in getRelatedEntriesFromDB", e);
 			throw e;
 		}
 	}
@@ -444,7 +443,7 @@ public class Recommender extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("Error in updateRecommendationCacheForEntry");
+			logger.error("Error in updateRecommendationCacheForEntry");
 			throw e;
 		}
 	}
@@ -464,7 +463,7 @@ public class Recommender extends Base
 		}
 		catch (Exception e)
 		{
-			Logger.error("Error in updateEntryRecommendations");
+			logger.error("Error in updateEntryRecommendations");
 			throw e;
 		}
 	}
@@ -496,7 +495,7 @@ public class Recommender extends Base
 		{
 			relatedEntry.nRecommendationID = rsRecommendationID.getInt("id");
 			if (relatedEntry.nRecommendationID == 0) {
-				Logger.info("oh crap");
+				logger.debug("oh crap");
 			}
 			relatedEntry.nClicks = rsRecommendationID.getInt("clicks");
 			relatedEntry.lAvgTimeAtDest = rsRecommendationID.getLong("avg_time_at_dest");
@@ -507,7 +506,7 @@ public class Recommender extends Base
 
 	private void addRecommendationsToDB(EntryInfo entry, Vector<EntryInfo> vRelatedEntries) throws SQLException
 	{
-		Logger.status("addrec");
+		logger.info("addrec");
 		try
 		{
 			int nRank = 1;
@@ -531,33 +530,33 @@ public class Recommender extends Base
 		}
 		catch (SQLException e)
 		{
-			Logger.error("Error in addRecommendationsToDB");
+			logger.error("Error in addRecommendationsToDB");
 			throw e;
 		}
 	}
 	
 	private void updateRecommendations(boolean bRedoAllRecommendations) throws Exception
 	{
-		Logger.status("==========================================================Create Recommendations");
+		logger.info("==========================================================Create Recommendations");
 		cn = getConnection();
 		Vector<Integer> vIDs = getIDsOfEntries(bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at");
 		if (vIDs.size() > 0) {
-			Logger.status("updateRecommendations - begin (entries to update): " + vIDs.size());
+			logger.info("updateRecommendations - begin (entries to update): " + vIDs.size());
 			updateRecommendations(vIDs, true);
-			Logger.status("updateRecommendations - end");
+			logger.info("updateRecommendations - end");
 		}
 		cn.close();
 	}
 	
 	private void updateCache() throws Exception
 	{
-		Logger.status("==========================================================Rebuild recommendation caches");
+		logger.info("==========================================================Rebuild recommendation caches");
 		cn = getConnection();
 		Vector<Integer> vIDs = getIDsOfEntries("");
 		if (vIDs.size() > 0) {
-			Logger.status("updateRecommendationCache - begin (entries to update): " + vIDs.size());
+			logger.info("updateRecommendationCache - begin (entries to update): " + vIDs.size());
 			updateRecommendations(vIDs, false);
-			Logger.status("updateRecommendationCache - end");
+			logger.info("updateRecommendationCache - end");
 		}
 		cn.close();
 	}
@@ -585,9 +584,8 @@ public class Recommender extends Base
 				update(true);
 			}
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
-		Logger.stopLogging();
 	}
 
 }

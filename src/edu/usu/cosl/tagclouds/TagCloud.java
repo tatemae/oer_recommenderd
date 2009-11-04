@@ -10,7 +10,6 @@ import java.util.Vector;
 
 import edu.usu.cosl.recommenderd.Base;
 import edu.usu.cosl.util.Locales;
-import edu.usu.cosl.util.Logger;
 
 public class TagCloud extends Base 
 {
@@ -92,7 +91,7 @@ public class TagCloud extends Base
 			pstAddTagCloud.setInt(2, nLanguageID);
 			pstAddTagCloud.setString(3, sFilter == null ? "" : sFilter);
 			pstAddTagCloud.setString(4, sTagCloud);
-//			Logger.info("" + sTagCloud.length() + " - " + sTagCloud);
+//			logger.info("" + sTagCloud.length() + " - " + sTagCloud);
 			pstAddTagCloud.addBatch();
 		}
 		if (nUpdatedClouds % 10 == 0) {
@@ -129,7 +128,7 @@ public class TagCloud extends Base
 			sbSQL.append(" AND s" + nTag + ".name = ? ");
 		}
 		sbSQL.append(sTagCloudSQL3);
-//		Logger.info(sbSQL.toString());
+//		logger.info(sbSQL.toString());
 		PreparedStatement pst = cn.prepareStatement(sbSQL.toString());
 
 		// specify the tag filter and max tags
@@ -148,7 +147,7 @@ public class TagCloud extends Base
 			cn = getConnection();
 			pstAddTagCloud = cn.prepareStatement("REPLACE INTO tag_clouds SET grain_size = ?, language_id = ?, filter = ?, tag_list = ?");
 	
-			Logger.info("Cloud: " + Locales.getCode(nLanguageID) + ", "  + sGrainSize + ", " + (sFilter == null ? "" : sFilter));
+			logger.info("Cloud: " + Locales.getCode(nLanguageID) + ", "  + sGrainSize + ", " + (sFilter == null ? "" : sFilter));
 			
 			pstGetTagCloud = getCloudStatement(sGrainSize);
 			getTagCloud(pstGetTagCloud);
@@ -166,7 +165,7 @@ public class TagCloud extends Base
 		} 
 		catch (Exception e)
 		{
-			Logger.error("updateCloud error: ", e);
+			logger.error("updateCloud error: ", e);
 			throw e;
 		}
 	}
@@ -192,7 +191,7 @@ public class TagCloud extends Base
 		{
 			cn = getConnection();
 			if ("course".equals(sGrainSize)) sQuery += " AND grain_size = 'course'";
-//			Logger.info(sQuery);
+//			logger.info(sQuery);
 			PreparedStatement ps = cn.prepareStatement(sQuery);
 			ps.setInt(1, nLanguageID);
 			ResultSet rs = ps.executeQuery();
@@ -215,7 +214,7 @@ public class TagCloud extends Base
 		} 
 		catch(Exception e)
 		{
-			Logger.error("getClouds error: ", e);
+			logger.error("getClouds error: ", e);
 			throw e;
 		}
 	}
@@ -225,7 +224,7 @@ public class TagCloud extends Base
 			Vector<TagCloud> vClouds = getClouds(LEVEL1_CLOUD, sGrainSize);
 			return vClouds.size() > 0 ? vClouds.firstElement() : new TagCloud();
 		} catch (Exception e) {
-			Logger.error("getTopLevelCloud error: ", e);
+			logger.error("getTopLevelCloud error: ", e);
 			throw e;
 		}
 		
@@ -268,21 +267,21 @@ public class TagCloud extends Base
 		}
 		}
 		} catch (Exception e) {
-			Logger.error("updateGrainSizeLanguageClouds error: ", e);
+			logger.error("updateGrainSizeLanguageClouds error: ", e);
 			throw e;
 		}
 	}
 
 	public static void update(int nLevel) throws Exception 
 	{
-		Logger.status("==========================================================Generate Tag Clouds - Level: " + nLevel);
-		Logger.status("Updating tag clouds - begin");
+		logger.info("==========================================================Generate Tag Clouds - Level: " + nLevel);
+		logger.info("Updating tag clouds - begin");
 		for (Enumeration<Integer> eLanguageIDs = Locales.getLocaleIDs(); eLanguageIDs.hasMoreElements();) 
 		{
 			int nLanguageID = eLanguageIDs.nextElement();
 			TagCloud.updateLanguageClouds(nLanguageID, nLevel);
 		}
-		Logger.status("Updating tag clouds - end");
+		logger.info("Updating tag clouds - end");
 	}
 	public static void update() throws Exception
 	{
@@ -303,8 +302,7 @@ public class TagCloud extends Base
 			}
 			else update();
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
-		Logger.stopLogging();
 	}
 }

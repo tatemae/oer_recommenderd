@@ -3,13 +3,12 @@ package edu.usu.cosl.recommender;
 import java.sql.Statement;
 
 import edu.usu.cosl.recommenderd.Base;
-import edu.usu.cosl.util.Logger;
 
 public class PersonalRecommender extends Base
 {
 	private void updatePersonalRecommendations() throws Exception
 	{
-		Logger.info("updatePersonalRecommendations-begin");
+		logger.info("updatePersonalRecommendations-begin");
 		
 		cn = getConnection();
 		
@@ -32,7 +31,7 @@ public class PersonalRecommender extends Base
 		
 		cn.close();
 		
-		Logger.info("updatePersonalRecommendations-end");
+		logger.info("updatePersonalRecommendations-end");
 	}
 	
 	public static void update() throws Exception
@@ -46,7 +45,7 @@ public class PersonalRecommender extends Base
 			getLoggerAndDBOptions("recommenderd.properties");
 			update();
 		} catch (Exception e) {
-			Logger.error(e);
+			logger.error(e);
 		}
 	}
 

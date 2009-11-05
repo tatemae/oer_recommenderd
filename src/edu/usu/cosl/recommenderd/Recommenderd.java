@@ -11,27 +11,37 @@ import edu.usu.cosl.tagclouds.TagCloud;
 
 public class Recommenderd extends Base {
 	
-	public Recommenderd(String sPropertiesFile, String sAction) throws IOException {
+	private String sPropertiesFile;
+	private boolean bAll = false;
+	
+	public Recommenderd(String sPropertiesFile) throws IOException {
+		this.sPropertiesFile = sPropertiesFile;
 		loadOptions(sPropertiesFile);
-		if (sAction.equals("skip_harvest"))
-			bHarvest = false;
-		if (sAction.equals("rebuild")) {
-			bHarvest = false;
-			bReIndexAll = true;
-			bRedoAllRecommendations = true;
-		}
+	}
+	
+	private boolean harvest() throws IOException{
+		return Harvester.harvest(sPropertiesFile);
+	}
+	
+	private void index() throws Exception{
+		Indexer.update(bAll);
+	}
+	
+	private void recommend() throws Exception{
+		Recommender.update(bAll);
 	}
 
-	private void processDocuments(String sPropertiesFile) throws IOException {
-		logger.debug("processDocuments - begin");
-
-		// use the aggregator to get any new records
-		boolean bChanges = true;
-		if (bHarvest)
-			bChanges = Harvester.harvest(sPropertiesFile);
-
+	private void all() throws Exception {
+		boolean bChanges = harvest();
 		if (isShutdownRequested()) return;
-		
+		if (bChanges) {
+			index();
+			if (isShutdownRequested()) return;
+			recommend();
+		}
+	}		
+
+	public void process() {
 		try {
 			if (bChanges || bReIndexAll) {
 

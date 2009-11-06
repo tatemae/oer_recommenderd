@@ -177,10 +177,10 @@ public class TagCloud extends Base
 			return sTag2 + "/" + sTag1;
 	}
 
-	private static void updateLanguageClouds(int nLanguageID, int nDepth) throws Exception 
+	private static void updateLanguageClouds(int nLanguageID, int nLevel) throws Exception 
 	{
-		updateGrainSizeLanguageClouds(nLanguageID, "all", nDepth);
-		updateGrainSizeLanguageClouds(nLanguageID, "course", nDepth);
+		updateGrainSizeLanguageClouds(nLanguageID, "all", nLevel);
+		updateGrainSizeLanguageClouds(nLanguageID, "course", nLevel);
 	}
 	
 	static final private String LEVEL1_CLOUD = "SELECT * FROM tag_clouds WHERE language_id = ? AND filter = ''";
@@ -235,13 +235,13 @@ public class TagCloud extends Base
 		try {
 		switch (nLevel)
 		{
-		case 0:
+		case 1:
 		{
 			final int TOP_LEVEL_TAG_COUNT = 200;
 			new TagCloud(nLanguageID, TOP_LEVEL_TAG_COUNT).updateCloud(sGrainSize);
 			break;
 		}
-		case 1:
+		case 2:
 		{
 			final int SECOND_LEVEL_TAG_COUNT = 50;
 			TagCloud tc = new TagCloud(nLanguageID).getTopLevelCloud(sGrainSize);
@@ -251,7 +251,7 @@ public class TagCloud extends Base
 			}
 			break;
 		}
-		case 2:
+		case 3:
 		{
 			Vector<TagCloud> vtc = new TagCloud(nLanguageID).getClouds(LEVEL2_CLOUDS, sGrainSize);
 			final int THIRD_LEVEL_TAG_COUNT = 50;
@@ -272,7 +272,7 @@ public class TagCloud extends Base
 		}
 	}
 
-	public static void update(int nLevel) throws Exception 
+	public static void updateTagLevel(int nLevel) throws Exception 
 	{
 		logger.info("==========================================================Generate Tag Clouds - Level: " + nLevel);
 		logger.info("Updating tag clouds - begin");
@@ -283,11 +283,16 @@ public class TagCloud extends Base
 		}
 		logger.info("Updating tag clouds - end");
 	}
-	public static void update() throws Exception
+
+	public static void update(int nDepth) throws Exception
 	{
-		for (int nLevel = 0; nLevel < 3; nLevel++) {
-			update(nLevel);
+		for (int nLevel = 1; nLevel <= nDepth; nLevel++) {
+			updateTagLevel(nLevel);
 		}
+	}
+
+	public static void update() throws Exception {
+		update(3);
 	}
 
 	public static void main(String[] args) 

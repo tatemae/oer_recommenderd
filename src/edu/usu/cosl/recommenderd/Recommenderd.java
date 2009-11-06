@@ -1,6 +1,8 @@
 package edu.usu.cosl.recommenderd;
 
 import java.io.IOException;
+import java.util.GregorianCalendar;
+import java.util.Calendar;
 
 import edu.usu.cosl.aggregatord.Harvester;
 import edu.usu.cosl.indexer.Indexer;
@@ -11,93 +13,138 @@ import edu.usu.cosl.tagclouds.TagCloud;
 
 public class Recommenderd extends Base {
 	
-	private String sPropertiesFile;
-	private boolean bAll = false;
+	private static int nSecondsToSleepBetweenTasks = 60;
 	
-	public Recommenderd(String sPropertiesFile) throws IOException {
+	private String sPropertiesFile;
+	private String sTask;
+	private boolean bFull = false;
+	private boolean bFullUpdateRanToday = false;
+	
+	public Recommenderd(String sPropertiesFile, String sTask, boolean bFull) throws IOException {
 		this.sPropertiesFile = sPropertiesFile;
+		this.sTask = sTask;
+		this.bFull = bFull;
 		loadOptions(sPropertiesFile);
 	}
 	
-	private boolean harvest() throws IOException{
-		return Harvester.harvest(sPropertiesFile);
-	}
-	
-	private void index() throws Exception{
-		Indexer.update(bAll);
-	}
-	
-	private void recommend() throws Exception{
-		Recommender.update(bAll);
+	private boolean setFull(boolean bFull) {
+		boolean bOldFull = this.bFull;
+		this.bFull = bFull;
+		return bOldFull;
 	}
 
-	private void all() throws Exception {
-		boolean bChanges = harvest();
-		if (isShutdownRequested()) return;
-		if (bChanges) {
+	private boolean harvest() throws IOException{return Harvester.harvest(sPropertiesFile);}
+	private boolean harvest(int nMaxNewEntries) throws IOException{return Harvester.harvest(sPropertiesFile,nMaxNewEntries);}
+	private void index() throws Exception{Indexer.update(bFull);}
+	private void recommend() throws Exception{Recommender.update(sPropertiesFile,bFull);}
+	private void autoGenerateSubjects() throws Exception{SubjectAutoGenerator.update();}
+	private void tagClouds() throws Exception{tagClouds(3);}
+	private void tagClouds(int nDepth) throws Exception{TagCloud.update(nDepth);}
+	private void personalRecommendations() throws Exception{PersonalRecommender.update();}
+
+	private void bootstrap() throws Exception{
+		bFull = false;
+		final int NUM_BOOTSTRAP_ENTRIES = 200;
+		if (harvest(NUM_BOOTSTRAP_ENTRIES)) {
+			if (isShutdownRequested()) return;
 			index();
 			if (isShutdownRequested()) return;
 			recommend();
-		}
-	}		
-
-	public void process() {
-		try {
-			if (bChanges || bReIndexAll) {
-
-				// update the index
-				Indexer.update(bReIndexAll);
-
-				if (isShutdownRequested()) return;
-
-				// for entries with fewer than 5 subjects (tags), we auto-generate more
-				SubjectAutoGenerator.update();
-
-				if (isShutdownRequested()) return;
-
-				// update to level tag clouds
-				TagCloud.update();
-
-				// seed the queries with common subjects
-				// QueryUpdater.update();
-			}
 			if (isShutdownRequested()) return;
-
-			if (bChanges || bRedoAllRecommendations) {
-				// create recommendations just for the new records, or for all
-				Recommender.update(bRedoAllRecommendations);
-
-				if (isShutdownRequested()) return;
-
-				// create recommendations for new users or update
-				// recommendations for old ones
-				PersonalRecommender.update();
-			}
-		} catch (Exception e) {
-			logger.error(e);
+			autoGenerateSubjects();
+			if (isShutdownRequested()) return;
+			tagClouds(1);
 		}
+	}
 
-		logger.debug("processDocuments - end");
-
-		if (isShutdownRequested()) return;
-
-		notifyAdminOfResults();
+	private void incrementalUpdate() throws Exception {
+		boolean bOldFull = setFull(false);
+		if (harvest()) {
+			if (isShutdownRequested()) return;
+			index();
+			if (isShutdownRequested()) return;
+			recommend();
+			if (isShutdownRequested()) return;
+			personalRecommendations();
+			if (isShutdownRequested()) return;
+			notifyAdminOfResults();
+		}
+		setFull(bOldFull);
 	}
 	
+	private void fullUpdate() throws Exception {
+		boolean bOldFull = setFull(true);
+		if (harvest()) {
+			if (isShutdownRequested()) return;
+			index();
+			if (isShutdownRequested()) return;
+			recommend();
+			if (isShutdownRequested()) return;
+			autoGenerateSubjects();
+			if (isShutdownRequested()) return;
+			tagClouds();
+			if (isShutdownRequested()) return;
+			personalRecommendations();
+			if (isShutdownRequested()) return;
+			notifyAdminOfResults();
+		}
+		setFull(bOldFull);
+		bFullUpdateRanToday = true;
+	}
+	
+	private boolean isFullUpdateDay(){
+		return nFullUpdateDay == new GregorianCalendar().get(Calendar.DAY_OF_WEEK);
+	}
+	
+	private boolean isFullUpdateHour(){
+		return nFullUpdateHour == new GregorianCalendar().get(Calendar.HOUR_OF_DAY);
+	}
+	
+	private boolean timeForFullUpdate() {
+		if (isFullUpdateDay()) {
+			if (!bFullUpdateRanToday && isFullUpdateHour()) return true;
+		} else {
+			bFullUpdateRanToday = false;
+		}
+		return false;
+	}
+	
+	private void doTask() throws Exception {
+		if ("daemon".equals(sTask)) {
+			if (bFull || timeForFullUpdate()) fullUpdate();
+			else incrementalUpdate();
+		}
+		else if ("harvest".equals(sTask)) harvest();
+		else if ("index".equals(sTask)) index();
+		else if ("recommend".equals(sTask)) recommend();
+		else if ("auto_generate_subjects".equals(sTask)) autoGenerateSubjects();
+		else if ("tag_clouds".equals(sTask)) tagClouds();
+		else if ("personal_recommendations".equals(sTask)) personalRecommendations();
+		else if ("bootstrap".equals(sTask)) bootstrap();
+	}
+
 	public static void main(String[] args) {
-		System.out.println(" INFO [main] (Recommender daemon starting up");
+		System.out.println(" INFO [main] Recommender daemon starting up");
 		if (startup()) {
 			try {
 				String sPropertiesFile = "recommenderd.properties";
-				String sAction = args.length > 0 ? args[0] : "";
-				Recommenderd daemon = new Recommenderd(sPropertiesFile, sAction);
-
-				while (!isShutdownRequested()) {
-					daemon.processDocuments(sPropertiesFile);
-					if(!isShutdownRequested())
-						try{Thread.sleep(60*1000);}catch(InterruptedException e){}
+				String sTask = args.length > 0 ? args[0] : "daemon";
+				boolean bFull = args.length > 1 && "full".equals(args[1]); 
+				Recommenderd daemon = new Recommenderd(sPropertiesFile, sTask, bFull);
+				
+				if ("daemon".equals(sTask)) {
+	
+					while (!isShutdownRequested()) {
+						daemon.doTask();
+	
+						if(!isShutdownRequested()) {
+							try{Thread.sleep(nSecondsToSleepBetweenTasks*1000);}catch(InterruptedException e){}
+						}
+					}
+				} else {
+					daemon.doTask();
 				}
-			}catch (IOException e) {}
+			}catch (Exception e) {System.out.println(e);}
 		}
 	}
 }

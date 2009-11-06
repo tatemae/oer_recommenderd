@@ -23,6 +23,8 @@ import org.apache.solr.core.CoreContainer.Initializer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 
+import org.apache.log4j.Level;
+
 import edu.usu.cosl.util.DBThread;
 import edu.usu.cosl.util.SendMail;
 
@@ -61,9 +63,11 @@ public class Base extends DBThread
         java.util.logging.Logger.getLogger(org.apache.solr.update.UpdateHandler.class.getName()).setLevel(level);
 	}
 	
-	protected boolean bHarvest = true;
-	protected boolean bRedoAllRecommendations = false;
-	protected boolean bReIndexAll = false;
+//	protected boolean bHarvest = true;
+//	protected boolean bRedoAllRecommendations = false;
+//	protected boolean bReIndexAll = false;
+	protected int nFullUpdateDay = 0;
+	protected int nFullUpdateHour = 1;
 	
 	protected void loadOptions(String sPropertiesFile) throws IOException
 	{
@@ -81,16 +85,8 @@ public class Base extends DBThread
 	        }
 	        sValue = properties.getProperty("admin_email");
 	        if (sValue != null) sAdminEmail = sValue;
-	        sValue = properties.getProperty("harvest");
-	        if (sValue != null) bHarvest = "true".equals(sValue);
-	        sValue = properties.getProperty("redo_recommendations");
-	        if (sValue != null) bRedoAllRecommendations = "true".equals(sValue);
-	        sValue = properties.getProperty("reindex_all");
-	        if (sValue != null) bReIndexAll = "true".equals(sValue);
 	        sValue = properties.getProperty("solr_config_filename");
 	        if (sValue != null && System.getProperty("solr.solr.home") == null) sSolrConfigFilename = sValue;
-	        sValue = properties.getProperty("tag_cloud_depth");
-	        if (sValue != null) try{nTagCloudDepth = Integer.parseInt(sValue);}catch(Exception nfe){logger.error("Unable to read tag_cloud_depth option value",nfe);} 
 	        
 	        getLoggerAndDBOptions(properties);
 	    }

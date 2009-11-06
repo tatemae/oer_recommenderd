@@ -561,28 +561,27 @@ public class Recommender extends Base
 		cn.close();
 	}
 
-	public static void update(boolean bRedoAllRecommendations) throws Exception
+	public static void rebuildCache(String sPropertiesFile) throws Exception
 	{
 		Recommender r = new Recommender();
-		r.loadOptions("recommenderd.properties");
-		r.updateRecommendations(bRedoAllRecommendations);
-	}
-
-	public static void rebuildCache() throws Exception
-	{
-		Recommender r = new Recommender();
-		r.loadOptions("recommenderd.properties");
+		r.loadOptions(sPropertiesFile);
 		r.updateCache();
 	}
 	
+	public static void update(String sPropertiesFile, boolean bRedoAllRecommendations) throws Exception
+	{
+		Recommender r = new Recommender();
+		r.loadOptions(sPropertiesFile);
+		r.updateRecommendations(bRedoAllRecommendations);
+	}
+
 	public static void main(String[] args) 
 	{
 		try {
-			if (args.length > 0 && "rebuild_cache".equals(args[0])) {
-				rebuildCache();
-			} else {
-				update(true);
-			}
+			String sPropertiesFile = args.length > 0 ? args[0] : "recommenderd.properties";
+			String sTask = args.length > 1 ? args[1] : "full";
+			if ("rebuild_cache".equals(sTask)) rebuildCache(sPropertiesFile);
+			else update(sPropertiesFile, true);
 		} catch (Exception e) {
 			logger.error(e);
 		}

@@ -353,8 +353,8 @@ public class Indexer extends Base
 	
 	public void updateIndexes(boolean bReIndexAll) throws Exception
 	{
-		logger.info("==========================================================Index");
-		logger.info("Updating indexes - begin");
+		logger.debug("==========================================================Index");
+		logger.debug("Updating indexes - begin");
 		setupPreparedStatements(); 
 		createAnalyzers();
 		updateForDeletedEntries();
@@ -362,7 +362,7 @@ public class Indexer extends Base
 		cleanupIndex();
 		closeCores();
 		closePreparedStatements();
-		logger.info("Updating indexes - end");
+		logger.debug("Updating indexes - end");
 	}
 		
 	public static void update(boolean bReIndexAll) throws Exception

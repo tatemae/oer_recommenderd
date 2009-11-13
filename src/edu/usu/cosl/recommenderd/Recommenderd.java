@@ -129,7 +129,7 @@ public class Recommenderd extends Base {
 			try {
 				String sPropertiesFile = "recommenderd.properties";
 				String sTask = args.length > 0 ? args[0] : "daemon";
-				boolean bFull = args.length > 1 && "full".equals(args[1]); 
+				boolean bFull = args.length > 1 && "redo".equals(args[1]); 
 				Recommenderd daemon = new Recommenderd(sPropertiesFile, sTask, bFull);
 				
 				if ("daemon".equals(sTask)) {

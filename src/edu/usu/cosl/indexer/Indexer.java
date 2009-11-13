@@ -5,6 +5,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import java.io.File;
+
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -51,9 +53,12 @@ public class Indexer extends Base
 		{
 			SolrCore core = eCores.nextElement();
 			String sName = core.getName();
-			String test=core.getIndexDir();
-			htWriters.put(sName, new IndexWriter(core.getIndexDir(), htAnalyzers.get(sName)));
-			
+			if (!htWriters.containsKey(sName)) {
+				File lockFile= new File(core.getIndexDir() + "write.lock");
+				if (lockFile.exists()) lockFile.delete();
+				htWriters.put(sName, new IndexWriter(core.getIndexDir(), htAnalyzers.get(sName)));
+				new File(core.getIndexDir() + "write.lock").deleteOnExit();
+			}
 		}
 	}
 	
@@ -238,7 +243,6 @@ public class Indexer extends Base
 		{
 			logger.error("updateIndex(3) - ", e);
 		}
-		logger.info("updateIndex - end");
 	}
 
 	private Vector<Integer> getEntriesPointingAtEntries(Vector<EntryInfo> vDeletedEntries) throws SQLException
@@ -353,8 +357,7 @@ public class Indexer extends Base
 	
 	public void updateIndexes(boolean bReIndexAll) throws Exception
 	{
-		logger.debug("==========================================================Index");
-		logger.debug("Updating indexes - begin");
+		logger.debug("==========================================================Indexing - Begin");
 		setupPreparedStatements(); 
 		createAnalyzers();
 		updateForDeletedEntries();
@@ -362,7 +365,7 @@ public class Indexer extends Base
 		cleanupIndex();
 		closeCores();
 		closePreparedStatements();
-		logger.debug("Updating indexes - end");
+		logger.debug("==========================================================Indexing - End");
 	}
 		
 	public static void update(boolean bReIndexAll) throws Exception

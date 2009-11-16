@@ -8,7 +8,7 @@ import edu.usu.cosl.aggregatord.Harvester;
 import edu.usu.cosl.indexer.Indexer;
 import edu.usu.cosl.recommender.PersonalRecommender;
 import edu.usu.cosl.recommender.Recommender;
-import edu.usu.cosl.tagclouds.SubjectAutoGenerator;
+import edu.usu.cosl.subjects.SubjectAutoGenerator;
 import edu.usu.cosl.tagclouds.TagCloud;
 
 public class Recommenderd extends Base {
@@ -40,7 +40,7 @@ public class Recommenderd extends Base {
 	private void autoGenerateSubjects() throws Exception{SubjectAutoGenerator.update();}
 	private void tagClouds() throws Exception{tagClouds(3);}
 	private void tagClouds(int nDepth) throws Exception{TagCloud.update(nDepth);}
-	private void personalRecommendations() throws Exception{PersonalRecommender.update();}
+	private void personalRecommendations() throws Exception{PersonalRecommender.update(bFull);}
 
 	private void bootstrap() throws Exception{
 		bFull = false;
@@ -82,6 +82,8 @@ public class Recommenderd extends Base {
 			if (isShutdownRequested()) return;
 			autoGenerateSubjects();
 			if (isShutdownRequested()) return;
+			index();
+			if (isShutdownRequested()) return;
 			tagClouds();
 			if (isShutdownRequested()) return;
 			personalRecommendations();
@@ -117,7 +119,7 @@ public class Recommenderd extends Base {
 		else if ("harvest".equals(sTask)) harvest();
 		else if ("index".equals(sTask)) index();
 		else if ("recommend".equals(sTask)) recommend();
-		else if ("auto_generate_subjects".equals(sTask)) autoGenerateSubjects();
+		else if ("subjects".equals(sTask)) autoGenerateSubjects();
 		else if ("tag_clouds".equals(sTask)) tagClouds();
 		else if ("personal_recommendations".equals(sTask)) personalRecommendations();
 		else if ("bootstrap".equals(sTask)) bootstrap();

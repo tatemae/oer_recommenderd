@@ -1,6 +1,9 @@
 package edu.usu.cosl.recommenderd;
 
 import java.sql.ResultSet;
+
+import edu.usu.cosl.subjects.Subject;
+
 import java.lang.Comparable;
 import java.util.Vector;
 
@@ -30,7 +33,8 @@ public class EntryInfo implements Comparable<EntryInfo>
 	public double dRelevance;
 	public int nClicks;
 	public long lAvgTimeAtDest = 60;
-	public Vector<String> vSubjects;
+	public Vector<Subject> vSubjects;
+	public Vector<Integer> vAggregations;
 	
 	public long lLastModified;
 	
@@ -49,5 +53,6 @@ public class EntryInfo implements Comparable<EntryInfo>
 		sGrainSize = rsEntries.getString("grain_size");
 	}
 	public int compareTo(EntryInfo e){return this.lAvgTimeAtDest > e.lAvgTimeAtDest ? 1 : this.lAvgTimeAtDest == e.lAvgTimeAtDest ? 0 : -1;}
+
 }
 

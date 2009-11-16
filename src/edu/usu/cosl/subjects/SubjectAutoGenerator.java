@@ -1,4 +1,4 @@
-package edu.usu.cosl.tagclouds;
+package edu.usu.cosl.subjects;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -18,6 +18,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.solr.core.SolrCore;
 
 import edu.usu.cosl.recommenderd.Base;
+import edu.usu.cosl.tagclouds.TermFrequency;
 import edu.usu.cosl.util.Locales;
 
 public class SubjectAutoGenerator extends Base 

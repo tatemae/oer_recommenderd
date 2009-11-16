@@ -31,13 +31,13 @@
 	<classpathentry kind="lib" path="lib/lucene-core-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/lucene-highlighter-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/lucene-memory-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-queries-2.4-dev.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-queries-2.4-dev.jar" sourcepath="/Users/Joel/Downloads/lucene-2.4.0/src/java"/>
 	<classpathentry kind="lib" path="lib/lucene-snowball-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/lucene-spellchecker-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
 	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
 	<classpathentry kind="lib" path="lib/rome-1.0.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.5.0_06"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregatord"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

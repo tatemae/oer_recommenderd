@@ -547,7 +547,7 @@ public class Recommender extends Base
 		logger.info("==========================================================Create Recommendations");
 		cn = getConnection();
 		nGlobalAggregationID = getGlobalAggregationID(cn);
-		Vector<Integer> vIDs = getIDsOfEntries("WHERE id > 81452"/*bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at"*/);
+		Vector<Integer> vIDs = getIDsOfEntries(bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at");
 		if (vIDs.size() > 0) {
 			logger.info("updateRecommendations - begin (entries to update): " + vIDs.size());
 			updateRecommendations(vIDs, true);

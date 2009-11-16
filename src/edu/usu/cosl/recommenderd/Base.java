@@ -141,31 +141,6 @@ public class Base extends DBThread
 //		}
 //	}
 	
-	protected int getLastID(Statement st) throws SQLException
-	{
-		ResultSet rsLastID = st.executeQuery("SELECT LAST_INSERT_ID()");
-		try
-		{
-			if (!rsLastID.next())
-			{
-				rsLastID.close();
-				throw new SQLException("Unable to retrieve the id for a newly added entry.");
-			}
-			int nLastID = rsLastID.getInt(1);
-			if (nLastID == 0)
-			{
-				rsLastID.close();
-				throw new SQLException("Unable to retrieve the id for a newly added entry.");
-			}
-			return nLastID;
-		}
-		catch (SQLException e)
-		{
-			if (rsLastID != null) rsLastID.close();
-			throw e;
-		}
-	}
-	
 	protected Vector<Integer> getIDsOfEntries(String sCondition) throws SQLException
 	{
 		Statement stEntriesToIndex = cn.createStatement();

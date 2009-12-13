@@ -57,6 +57,37 @@ public class Recommenderd extends Base {
 		}
 	}
 
+	private boolean isFullUpdateDay(){
+		return nFullUpdateDay == new GregorianCalendar().get(Calendar.DAY_OF_WEEK);
+	}
+	
+	private boolean isFullUpdateHour(){
+		return nFullUpdateHour == new GregorianCalendar().get(Calendar.HOUR_OF_DAY);
+	}
+	
+	private boolean timeForFullUpdate() {
+		if (isFullUpdateDay()) {
+			if (!bFullUpdateRanToday && isFullUpdateHour()) return true;
+		} else {
+			bFullUpdateRanToday = false;
+		}
+		return false;
+	}
+	
+	private void doTask() throws Exception {
+		if ("daemon".equals(sTask)) {
+			if (bFull || timeForFullUpdate()) fullUpdate();
+			else incrementalUpdate();
+		}
+		else if ("harvest".equals(sTask)) harvest();
+		else if ("index".equals(sTask)) index();
+		else if ("recommend".equals(sTask)) recommend();
+		else if ("subjects".equals(sTask)) autoGenerateSubjects();
+		else if ("tag_clouds".equals(sTask)) tagClouds();
+		else if ("personal_recommendations".equals(sTask)) personalRecommendations();
+		else if ("bootstrap".equals(sTask)) bootstrap();
+	}
+
 	private void incrementalUpdate() throws Exception {
 		boolean bOldFull = setFull(false);
 		if (harvest()) {
@@ -94,37 +125,6 @@ public class Recommenderd extends Base {
 		bFullUpdateRanToday = true;
 	}
 	
-	private boolean isFullUpdateDay(){
-		return nFullUpdateDay == new GregorianCalendar().get(Calendar.DAY_OF_WEEK);
-	}
-	
-	private boolean isFullUpdateHour(){
-		return nFullUpdateHour == new GregorianCalendar().get(Calendar.HOUR_OF_DAY);
-	}
-	
-	private boolean timeForFullUpdate() {
-		if (isFullUpdateDay()) {
-			if (!bFullUpdateRanToday && isFullUpdateHour()) return true;
-		} else {
-			bFullUpdateRanToday = false;
-		}
-		return false;
-	}
-	
-	private void doTask() throws Exception {
-		if ("daemon".equals(sTask)) {
-			if (bFull || timeForFullUpdate()) fullUpdate();
-			else incrementalUpdate();
-		}
-		else if ("harvest".equals(sTask)) harvest();
-		else if ("index".equals(sTask)) index();
-		else if ("recommend".equals(sTask)) recommend();
-		else if ("subjects".equals(sTask)) autoGenerateSubjects();
-		else if ("tag_clouds".equals(sTask)) tagClouds();
-		else if ("personal_recommendations".equals(sTask)) personalRecommendations();
-		else if ("bootstrap".equals(sTask)) bootstrap();
-	}
-
 	public static void main(String[] args) {
 		System.out.println(" INFO [main] Recommender daemon starting up");
 		if (startup()) {

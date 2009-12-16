@@ -17,7 +17,6 @@
 	<classpathentry kind="lib" path="lib/jaxrpc.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.8.jar"/>
 	<classpathentry kind="lib" path="lib/wsdl4j-1.5.1.jar"/>
-	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.7-bin.jar"/>
 	<classpathentry kind="lib" path="lib/apache-solr-core-1.3.0.jar" sourcepath="c:/java/apache-solr-1.3.0.zip"/>
 	<classpathentry kind="lib" path="lib/apache-solr-common-1.3.0.jar"/>
 	<classpathentry kind="lib" path="lib/apache-solr-dataimporthandler-1.3.0.jar"/>
@@ -37,6 +36,7 @@
 	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
 	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
 	<classpathentry kind="lib" path="lib/rome-1.0.jar"/>
+	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.10-bin.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregatord"/>
 	<classpathentry kind="output" path="bin"/>

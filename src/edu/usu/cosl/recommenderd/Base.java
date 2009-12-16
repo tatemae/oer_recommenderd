@@ -167,7 +167,7 @@ public class Base extends DBThread
 		if (mcore == null) initMultiCore();
 		
 		vCores = new Vector<SolrCore>();
-		htAnalyzers = new Hashtable<String, org.apache.lucene.analysis.Analyzer>();
+		htAnalyzers = new Hashtable<String, Analyzer>();
 
 		for (Iterator<SolrCore> eCores = mcore.getCores().iterator(); eCores.hasNext();)
 		{
@@ -188,6 +188,8 @@ public class Base extends DBThread
 		{
 			eCores.nextElement().close();
 		}
+		htAnalyzers.clear();
+		htAnalyzers = null;
 		vCores.removeAllElements();
 		vCores = null;
 	}

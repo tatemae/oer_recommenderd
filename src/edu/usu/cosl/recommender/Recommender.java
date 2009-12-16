@@ -1,6 +1,7 @@
 package edu.usu.cosl.recommender;
 
 import java.sql.PreparedStatement;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -8,6 +9,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Vector;
+import java.io.IOException;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -38,8 +40,22 @@ public class Recommender extends Base
 	private PreparedStatement pstSetDocumentRecommendations;
 	private PreparedStatement pstGetEntryRecommendations;
 	private int nGlobalAggregationID;
+	private int nEntry;
 	
-	private void updateRecommendations(Vector<Integer> vIDs, boolean bGenerateRecommendations)
+	private void updateRecommendations(Vector<Integer> vIDs, boolean bGenerateRecommendations) {
+		nEntry = 1;
+		Enumeration<Integer> eIDs = vIDs.elements(); 
+		while (eIDs.hasMoreElements()) {
+			updateRecommendations(eIDs, bGenerateRecommendations);
+			try {
+				cn.close();
+				reloadDBDriver();
+				cn = getConnection();
+			}catch(Exception e) {}
+			System.gc();
+		}
+	}
+	private void updateRecommendations(Enumeration<Integer> eIDs, boolean bGenerateRecommendations)
 	{
 		try
 		{
@@ -49,8 +65,6 @@ public class Recommender extends Base
 		    
 		    try
 		    {
-				int nEntry = 0;
-	
 				pstGetRecommendationID = cn.prepareStatement(
 					"SELECT id, clicks, avg_time_at_dest FROM recommendations WHERE entry_id = ? AND dest_entry_id = ?");
 				
@@ -74,7 +88,8 @@ public class Recommender extends Base
 					"SELECT id, feed_id, permalink, direct_link, title, description, language_id, grain_size " +
 					"FROM entries WHERE id = ?");
 				
-				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
+//				for (Enumeration<Integer> eIDs = vIDs.elements(); eIDs.hasMoreElements();)
+				while (nEntry % 1000 != 0 && eIDs.hasMoreElements())
 				{
 					pstEntryToCreateRecommendationsFor.setInt(1, eIDs.nextElement().intValue());
 					ResultSet rsEntryToCreateRecommendationsFor = pstEntryToCreateRecommendationsFor.executeQuery();
@@ -88,14 +103,15 @@ public class Recommender extends Base
 						nEntry++;
 					}
 					rsEntryToCreateRecommendationsFor.close();
-					if (nEntry % 100 == 0)
-					{
-						pstSetDocumentRecommendations.executeBatch();
-						pstUpdateRecommendation.executeBatch();
-					}
+//					if (nEntry % 100 == 0)
+//					{
+//						pstSetDocumentRecommendations.executeBatch();
+//						pstUpdateRecommendation.executeBatch();
+//					}
 					if (nEntry % 1000 == 0)logger.info("Recommending: " + nEntry);
 					else if (nEntry % 100 == 0)logger.debug("Recommending: " + nEntry);
 				}
+				nEntry++;
 				pstEntryToCreateRecommendationsFor.close();
 				
 				pstGetEntryRecommendations.close();
@@ -483,7 +499,7 @@ public class Recommender extends Base
 		pstAddRecommendation.setInt(3, nRank);
 		pstAddRecommendation.setDouble(4, relatedEntry.dRelevance);
 		pstAddRecommendation.execute();
-		entry.nRecommendationID = getLastID(pstAddRecommendation);
+		relatedEntry.nRecommendationID = getLastID(pstAddRecommendation);
 	}
 	
 	private void updateRecommendation(EntryInfo relatedEntry, int nRank) throws SQLException
@@ -502,9 +518,6 @@ public class Recommender extends Base
 		if (rsRecommendationID.next())
 		{
 			relatedEntry.nRecommendationID = rsRecommendationID.getInt("id");
-			if (relatedEntry.nRecommendationID == 0) {
-				logger.debug("oh crap");
-			}
 			relatedEntry.nClicks = rsRecommendationID.getInt("clicks");
 			relatedEntry.lAvgTimeAtDest = rsRecommendationID.getLong("avg_time_at_dest");
 		}
@@ -533,7 +546,7 @@ public class Recommender extends Base
 				}
 				nRank++;
 			}
-			pstAddRecommendation.executeBatch();
+			pstUpdateRecommendation.executeBatch();
 		}
 		catch (SQLException e)
 		{

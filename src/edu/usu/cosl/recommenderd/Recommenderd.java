@@ -95,8 +95,8 @@ public class Recommenderd extends Base {
 			index();
 			if (isShutdownRequested()) return;
 			recommend();
-			if (isShutdownRequested()) return;
-			personalRecommendations();
+//			if (isShutdownRequested()) return;
+//			personalRecommendations();
 			if (isShutdownRequested()) return;
 			notifyAdminOfResults();
 		}
@@ -105,22 +105,21 @@ public class Recommenderd extends Base {
 	
 	private void fullUpdate() throws Exception {
 		boolean bOldFull = setFull(true);
-		if (harvest()) {
-			if (isShutdownRequested()) return;
-			index();
-			if (isShutdownRequested()) return;
-			recommend();
-			if (isShutdownRequested()) return;
-			autoGenerateSubjects();
-			if (isShutdownRequested()) return;
-			index();
-			if (isShutdownRequested()) return;
-			tagClouds();
-			if (isShutdownRequested()) return;
-			personalRecommendations();
-			if (isShutdownRequested()) return;
-			notifyAdminOfResults();
-		}
+		harvest();
+		if (isShutdownRequested()) return;
+		index();
+		if (isShutdownRequested()) return;
+		recommend();
+		if (isShutdownRequested()) return;
+		autoGenerateSubjects();
+		if (isShutdownRequested()) return;
+		index();
+		if (isShutdownRequested()) return;
+		tagClouds();
+//			if (isShutdownRequested()) return;
+//			personalRecommendations();
+		if (isShutdownRequested()) return;
+		notifyAdminOfResults();
 		setFull(bOldFull);
 		bFullUpdateRanToday = true;
 	}

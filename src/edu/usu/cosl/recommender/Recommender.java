@@ -420,7 +420,7 @@ public class Recommender extends Base
 			    	// keep track of titles and uris so we don't duplicate them
 			    	hsRecommendations.add(sNormalizedTitle);
 					hsRecommendations.add(sURI);
-					if (sDirectLink != null) hsRecommendations.add(sDirectLink);
+					if (sDirectLink != null && sDirectLink.length() > 0) hsRecommendations.add(sDirectLink);
 				}
 			}
 		}

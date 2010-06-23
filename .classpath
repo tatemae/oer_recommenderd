@@ -26,17 +26,71 @@
 	<classpathentry kind="lib" path="lib/commons-io-1.3.1.jar"/>
 	<classpathentry kind="lib" path="lib/geronimo-stax-api_1.0_spec-1.0.1.jar"/>
 	<classpathentry kind="lib" path="lib/junit-4.3.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-analyzers-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-core-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-highlighter-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-memory-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-queries-2.4-dev.jar" sourcepath="/Users/Joel/Downloads/lucene-2.4.0/src/java"/>
-	<classpathentry kind="lib" path="lib/lucene-snowball-2.4-dev.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-spellchecker-2.4-dev.jar"/>
 	<classpathentry kind="lib" path="lib/stax-utils.jar"/>
 	<classpathentry kind="lib" path="lib/wstx-asl-3.2.7.jar"/>
 	<classpathentry kind="lib" path="lib/rome-1.0.jar"/>
 	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.10-bin.jar"/>
+	<classpathentry kind="lib" path="lib/mia/cglib-nodep-2.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/classworlds-1.1-alpha-2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-beanutils-1.7.0.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-cli-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-cli-2.0-mahout.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-codec-1.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-collections-3.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-dbcp-1.2.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-digester-1.7.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-httpclient-3.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-lang-2.4.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-math-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/commons-pool-1.4.jar"/>
+	<classpathentry kind="lib" path="lib/mia/easymock-2.5.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/easymockclassextension-2.5.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/file-management-1.2.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/google-collections-1.0-rc2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/gson-1.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/hadoop-core-0.20.2.jar" sourcepath="/Applications/hadoop-0.20.2/src/core"/>
+	<classpathentry kind="lib" path="lib/mia/hbase-0.20.0.jar"/>
+	<classpathentry kind="lib" path="lib/mia/javaee-api-5.0-1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/jets3t-0.7.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/junit-4.7.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-analyzers-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-benchmark-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-core-2.9.1.jar" sourcepath="lib/mia/lucene-2.9.1-src.zip"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-demos-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-highlighter-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-memory-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/lucene-wikipedia-2.9.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/maven-artifact-2.0.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/maven-artifact-manager-2.0.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/maven-plugin-api-2.0.6.jar"/>
+	<classpathentry kind="lib" path="lib/mia/maven-repository-metadata-2.0.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/maven-shared-io-1.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/objenesis-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/oro-2.0.8.jar"/>
+	<classpathentry kind="lib" path="lib/mia/plexus-container-default-1.0-alpha-9.jar"/>
+	<classpathentry kind="lib" path="lib/mia/plexus-utils-1.5.6.jar"/>
+	<classpathentry kind="lib" path="lib/mia/slf4j-api-1.5.8.jar"/>
+	<classpathentry kind="lib" path="lib/mia/slf4j-jcl-1.5.8.jar"/>
+	<classpathentry kind="lib" path="lib/mia/uncommons-maths-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/velocity-1.5.jar"/>
+	<classpathentry kind="lib" path="lib/mia/wagon-provider-api-1.0-alpha-6.jar"/>
+	<classpathentry kind="lib" path="lib/mia/watchmaker-framework-0.6.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/watchmaker-swing-0.6.2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/xml-apis-1.0.b2.jar"/>
+	<classpathentry kind="lib" path="lib/mia/xpp3_min-1.1.4c.jar"/>
+	<classpathentry kind="lib" path="lib/mia/xpp3-LICENSE.txt"/>
+	<classpathentry kind="lib" path="lib/mia/xstream-1.3.1.jar"/>
+	<classpathentry kind="lib" path="lib/mia/xstream-LICENSE.txt"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-collections-0.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-core-0.3.jar" sourcepath="lib/mia/mahout/mahout-0.3-src.zip"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-core-0.3.job"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-examples-0.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-examples-0.3.job"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-math-0.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-taste-0.3.jar"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-taste-webapp-0.3.war"/>
+	<classpathentry kind="lib" path="lib/mia/mahout/mahout-utils-0.3.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/oer_aggregatord"/>
 	<classpathentry kind="output" path="bin"/>

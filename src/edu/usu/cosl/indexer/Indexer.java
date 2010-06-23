@@ -100,6 +100,8 @@ public class Indexer extends Base
 	
 	private void removeDeletedEntriesFromIndex(Vector<EntryInfo> vDeletedEntries) throws Exception
 	{
+		logger.debug("Removing deleted entries from index:" + vDeletedEntries.size());
+		
 		createIndexWriters();
 
 		for (Enumeration<EntryInfo> deletedEntries = vDeletedEntries.elements(); deletedEntries.hasMoreElements();)
@@ -109,6 +111,8 @@ public class Indexer extends Base
 		}
 		
 		closeIndexWriters();
+
+		logger.debug("Done deleting entries from index");
 	}
 	
 	private PreparedStatement pstIsEntryInDB;
@@ -283,8 +287,10 @@ public class Indexer extends Base
 		}
 	}
 
-	private Vector<Integer> getEntriesPointingAtEntries(Vector<EntryInfo> vDeletedEntries) throws SQLException
+	private Vector<Integer> getEntriesPointingAtDeletedEntries(Vector<EntryInfo> vDeletedEntries) throws SQLException
 	{
+		logger.debug("Getting entries pointed at deleted entries");
+		
 		pstEntriesPointingAtEntry = cn.prepareStatement("SELECT entry_id FROM recommendations WHERE dest_entry_id = ?");
 
 		Vector<Integer> vEntriesToUpdate = new Vector<Integer>();
@@ -295,6 +301,8 @@ public class Indexer extends Base
 			getIDsOfEntriesPointingAtEntry(vEntriesToUpdate, entry.nEntryID);
 		}
 		pstEntriesPointingAtEntry.close();
+
+		logger.debug("Done getting entries pointed at deleted entries");
 		return vEntriesToUpdate;
 	}
 	
@@ -329,6 +337,8 @@ public class Indexer extends Base
 
 	private void flagNeedUpdatedRecommendations(Vector<Integer> vEntries) throws SQLException
 	{
+		logger.debug("Flagging entries that had recommendations to entries that were deleted");
+		
 		StringBuffer sbUpdate = new StringBuffer("UPDATE entries SET relevance_calculated_at = '1971-01-01' WHERE id IN (");
 		Enumeration<Integer> eIDs = vEntries.elements();
 		while (true)
@@ -341,6 +351,8 @@ public class Indexer extends Base
 		Statement st = cn.createStatement();
 		st.executeUpdate(sbUpdate.toString());
 		st.close();
+
+		logger.debug("Done flagging entries that had recommendations to entries that were deleted");
 	}
 	
 	private void updateForDeletedEntries() throws Exception
@@ -353,7 +365,7 @@ public class Indexer extends Base
 		try
 		{
 			removeDeletedEntriesFromIndex(vEntries);
-			Vector<Integer> vEntriesToUpdate = getEntriesPointingAtEntries(vEntries); 
+			Vector<Integer> vEntriesToUpdate = getEntriesPointingAtDeletedEntries(vEntries); 
 			deleteRecommendationsInvolvingEntries(vEntries);
 			flagNeedUpdatedRecommendations(vEntriesToUpdate);
 		}
@@ -361,10 +373,13 @@ public class Indexer extends Base
 		{
 			logger.error("updateForDeletedEntries", e);
 		}
+		logger.debug("Done deleting entries");
 	}
 	
 	private void deleteRecommendationsInvolvingEntries(Vector<EntryInfo> vDeletedEntries) throws Exception
 	{
+		logger.debug("Deleting recommendations involving entries");
+		
 		pstDeleteEntryRecommendations = cn.prepareStatement(
 			"DELETE FROM recommendations WHERE dest_entry_id = ? OR entry_id = ?");
 
@@ -380,6 +395,8 @@ public class Indexer extends Base
 		pstDeleteEntryRecommendations = null;
 		pstDeleteEntry.close();
 		pstDeleteEntry = null;
+
+		logger.debug("Done deleting recommendations involving entries");
 	}
 	private void deleteRecommendationsInvolvingEntry(int nEntryID) throws Exception
 	{

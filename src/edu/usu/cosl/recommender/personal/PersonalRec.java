@@ -1,4 +1,4 @@
-package edu.usu.cosl.recommender;
+package edu.usu.cosl.recommender.personal;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

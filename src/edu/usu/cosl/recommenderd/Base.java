@@ -23,10 +23,10 @@ import org.apache.solr.core.CoreContainer.Initializer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 
-import org.apache.log4j.Level;
+//import org.apache.log4j.Level;
 
 import edu.usu.cosl.util.DBThread;
-import edu.usu.cosl.util.SendMail;
+//import edu.usu.cosl.util.SendMail;
 
 
 public class Base extends DBThread 
@@ -73,6 +73,7 @@ public class Base extends DBThread
 	{
 	    try 
 	    {
+	    	System.out.println("Loading configuration options from: " + sPropertiesFile);
 	    	Properties properties = loadPropertyFile(sPropertiesFile);
 	        
 			// get some options out of it

@@ -6,8 +6,8 @@ import java.util.Calendar;
 
 import edu.usu.cosl.aggregatord.Harvester;
 import edu.usu.cosl.indexer.Indexer;
-import edu.usu.cosl.recommender.PersonalRecommender;
 import edu.usu.cosl.recommender.Recommender;
+import edu.usu.cosl.recommender.personal.PersonalRecommender;
 import edu.usu.cosl.subjects.SubjectAutoGenerator;
 import edu.usu.cosl.tagclouds.TagCloud;
 
@@ -79,6 +79,7 @@ public class Recommenderd extends Base {
 			if (bFull || timeForFullUpdate()) fullUpdate();
 			else incrementalUpdate();
 		}
+		else if ("update".equals(sTask)) incrementalUpdate();
 		else if ("harvest".equals(sTask)) harvest();
 		else if ("index".equals(sTask)) index();
 		else if ("recommend".equals(sTask)) recommend();

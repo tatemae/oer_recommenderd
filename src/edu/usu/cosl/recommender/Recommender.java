@@ -560,7 +560,9 @@ public class Recommender extends Base
 		logger.info("==========================================================Create Recommendations");
 		cn = getConnection();
 		nGlobalAggregationID = getGlobalAggregationID(cn);
-		Vector<Integer> vIDs = getIDsOfEntries(bRedoAllRecommendations ? "":"WHERE indexed_at > relevance_calculated_at");
+		String sConditions = "WHERE permalink_good = true AND oai_identifier != 'deleted'";
+		if (!bRedoAllRecommendations) sConditions += "AND indexed_at > relevance_calculated_at";
+		Vector<Integer> vIDs = getIDsOfEntries(sConditions);
 		if (vIDs.size() > 0) {
 			logger.info("updateRecommendations - begin (entries to update): " + vIDs.size());
 			updateRecommendations(vIDs, true);
@@ -573,7 +575,8 @@ public class Recommender extends Base
 	{
 		logger.info("==========================================================Rebuild recommendation caches");
 		cn = getConnection();
-		Vector<Integer> vIDs = getIDsOfEntries("");
+		String sConditions = "WHERE permalink_good = true AND oai_identifier != 'deleted'";
+		Vector<Integer> vIDs = getIDsOfEntries(sConditions);
 		if (vIDs.size() > 0) {
 			logger.info("updateRecommendationCache - begin (entries to update): " + vIDs.size());
 			updateRecommendations(vIDs, false);

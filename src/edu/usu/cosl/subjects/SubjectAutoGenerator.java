@@ -150,7 +150,9 @@ public class SubjectAutoGenerator extends Base
 			
 			// ask the db for the entries that have been updated or added for the language
 			int nLanguageID = Locales.getID(sLanguageCode);
-			Vector<Integer> vIDs = getIDsOfEntries("WHERE indexed_at > relevance_calculated_at AND language_id = " + nLanguageID);
+			String sConditions = "WHERE permalink_good = true AND oai_identifier != 'deleted'";
+			sConditions += "WHERE indexed_at > relevance_calculated_at AND language_id = " + nLanguageID;
+			Vector<Integer> vIDs = getIDsOfEntries(sConditions);
 			logger.info("Generating subjects for entries (" + sLanguageCode + "): " + vIDs.size());
 			int nEntry = 0;
 			for(Enumeration<Integer> eID = vIDs.elements(); eID.hasMoreElements();)

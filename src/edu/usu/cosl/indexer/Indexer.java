@@ -323,12 +323,13 @@ public class Indexer extends Base
 		Vector<EntryInfo> vEntries = new Vector<EntryInfo>();
 
 		Statement stEntries = cn.createStatement();
-		ResultSet rsEntries = stEntries.executeQuery("SELECT id, language_id FROM entries WHERE oai_identifier = 'deleted' OR permalink_good = false");
+		ResultSet rsEntries = stEntries.executeQuery("SELECT id, language_id, oai_identifier FROM entries WHERE oai_identifier = 'deleted' OR permalink_good = false");
 		while (rsEntries.next())
 		{
 			EntryInfo entry = new EntryInfo();
 			entry.nEntryID = rsEntries.getInt(1);
 			entry.nLanguageID = rsEntries.getInt(2);
+			entry.bDeleted = "deleted".equals(rsEntries.getString(3));
 			vEntries.add(entry);
 		}
 		rsEntries.close();
@@ -390,7 +391,7 @@ public class Indexer extends Base
 		for (Enumeration<EntryInfo> deletedEntries = vDeletedEntries.elements(); deletedEntries.hasMoreElements();)
 		{
 			EntryInfo entry = deletedEntries.nextElement();
-			deleteRecommendationsInvolvingEntry(entry.nEntryID);
+			deleteRecommendationsInvolvingEntry(entry.nEntryID, entry.bDeleted);
 		}
 		pstDeleteEntryRecommendations.close();
 		pstDeleteEntryRecommendations = null;
@@ -399,7 +400,7 @@ public class Indexer extends Base
 
 		logger.debug("Done deleting recommendations involving entries");
 	}
-	private void deleteRecommendationsInvolvingEntry(int nEntryID) throws Exception
+	private void deleteRecommendationsInvolvingEntry(int nEntryID, boolean bDeleteEntry) throws Exception
 	{
 		// delete recommendations involving the entry being deleted 
 		pstDeleteEntryRecommendations.setInt(1, nEntryID);
@@ -407,8 +408,10 @@ public class Indexer extends Base
 		pstDeleteEntryRecommendations.executeUpdate();
 		
 		// delete the entry
-		pstDeleteEntry.setInt(1, nEntryID);
-		pstDeleteEntry.executeUpdate();
+		if (bDeleteEntry) {
+			pstDeleteEntry.setInt(1, nEntryID);
+			pstDeleteEntry.executeUpdate();
+		}
 	}
 	
 	private Vector<String> getCoreNames() throws Exception{

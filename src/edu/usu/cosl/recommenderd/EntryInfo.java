@@ -25,6 +25,7 @@ public class EntryInfo implements Comparable<EntryInfo>
 	public int nLanguageID;
 	public int nLocalDocumentID;
 	public int nRecommendationID;
+	public boolean bDeleted;
 	
 	public String sTitle;
 	public String sURI;
